@@ -49,11 +49,41 @@ class ConfigManager:
         self.data_dir = self.skill_dir / self.DATA_DIRNAME
         self.config_file = self.data_dir / self.CONFIG_FILENAME
         
+        # 启动时清理无效的配置文件（如 Kimi 检查完整性时创建的空文件）
+        self._cleanup_invalid_config()
+        
         self._config: Optional[Dict[str, Any]] = None
+    
+    def _cleanup_invalid_config(self) -> bool:
+        """
+        清理无效的配置文件（空文件或无法访问的文件）
+        
+        Returns:
+            是否执行了清理
+        """
+        if not self.config_file.exists():
+            return False
+        
+        # 检查文件是否为空或无法访问
+        try:
+            if self.config_file.stat().st_size == 0:
+                self.config_file.unlink()
+                return True
+        except (OSError, IOError):
+            # 无法访问文件，尝试删除
+            try:
+                self.config_file.unlink()
+                return True
+            except (OSError, IOError):
+                pass
+        
+        return False
     
     @property
     def is_configured(self) -> bool:
         """是否已配置（配置文件存在且有效）"""
+        # 先清理无效文件
+        self._cleanup_invalid_config()
         return self.config_file.exists()
     
     def load(self) -> Dict[str, Any]:

@@ -134,8 +134,7 @@ skill-install-project/              # 管理目录
 │   │   ├── path_manager.py         # 路径管理
 │   │   ├── platform_utils.py       # 跨平台工具
 │   │   └── validator.py            # 安装验证
-│   └── data/                       # 运行时数据
-│       └── config.json             # 配置文件
+│   └── data/                       # 运行时数据目录（首次使用自动生成 config.json）
 ├── skill-pdf/                      # 其他 skills...
 ├── skill-xlsx/
 └── ...
