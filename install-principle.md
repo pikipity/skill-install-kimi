@@ -121,7 +121,7 @@
 
 | 变量 | 说明 | 示例 |
 |------|------|------|
-| `{管理目录}` | 本文件所在目录的父目录 | `/Users/ze/Documents/kimi/` |
+| `{管理目录}` | 本文件所在目录的父目录 | `/Users/{username}/Documents/kimi/` |
 | `{项目目录}` | 当前工作目录（skill 仓库放在这里） | `{管理目录}/skill/` |
 | `{全局配置}` | Kimi CLI 全局配置目录 | `~/.kimi/` 或 `%USERPROFILE%\.kimi\` |
 
@@ -143,7 +143,7 @@ ln -s ../../Documents/kimi/skill/kimi-skills/skills/kimi-docx kimi-docx
 
 **错误**（绝对路径）：
 ```bash
-ln -s /Users/ze/Documents/kimi/skill/kimi-skills/skills/kimi-docx kimi-docx
+ln -s /Users/{username}/Documents/kimi/skill/kimi-skills/skills/kimi-docx kimi-docx
 # 项目移动后软连接会断裂
 ```
 

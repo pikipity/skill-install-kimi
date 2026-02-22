@@ -46,7 +46,7 @@ status = api.validate_setup()
 skill-installer 需要一个管理目录来存放所有 skill 仓库。
 
 【选项】
-  [A] 使用当前目录：/Users/ze/Documents/kimi/skills/
+  [A] 使用当前目录：/Users/{username}/Documents/kimi/skills/
   [B] 自定义其他目录
 
 请选择 > 
@@ -80,7 +80,7 @@ plan = api.generate_install_plan(skill_name, option="full")
 ═══════════════════════════════════════════════════════
 
 【安装位置】
-  原始仓库：/Users/ze/Documents/kimi/skills/skill-pdf/
+  原始仓库：/Users/{username}/Documents/kimi/skills/skill-pdf/
   软连接：  ~/.kimi/skills/skill-pdf
 
 【选项】
@@ -111,7 +111,7 @@ plan = api.generate_uninstall_plan(skill_name)
   ✅ 删除软连接：~/.kimi/skills/skill-pdf
 
 【将保留的内容】
-  原始仓库：/Users/ze/Documents/kimi/skills/skill-pdf/
+  原始仓库：/Users/{username}/Documents/kimi/skills/skill-pdf/
   （如需删除，请手动执行：rm -rf '...'）
 ```
 

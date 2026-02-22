@@ -246,11 +246,11 @@ def is_admin() -> bool:
 PowerShell:
   New-Item -ItemType SymbolicLink `
     -Path "$env:USERPROFILE\.kimi\skills\skill-installer" `
-    -Target "C:\Users\ze\skill-install-project\skill-installer"
+    -Target "C:\Users\{username}\skill-install-project\skill-installer"
 
 CMD:
   mklink /D %USERPROFILE%\.kimi\skills\skill-installer `
-    C:\Users\ze\skill-install-project\skill-installer
+    C:\Users\{username}\skill-install-project\skill-installer
 
 完成后，按回车继续...
 ```
@@ -372,7 +372,7 @@ class PlatformInfo:
 ═══════════════════════════════════════════════════════
 
 【当前项目目录】
-  /Users/ze/Documents/kimi/skill/skill-install-project/
+  /Users/{username}/Documents/kimi/skill/skill-install-project/
 
 【请选择管理目录】
   [A] 使用当前项目目录作为管理目录
@@ -385,7 +385,7 @@ class PlatformInfo:
 ═══════════════════════════════════════════════════════
 
 您选择了：
-  管理目录：/Users/ze/Documents/kimi/skill/skill-install-project/
+  管理目录：/Users/{username}/Documents/kimi/skill/skill-install-project/
 
 是否确认？ [Y/n]：Y
 
@@ -399,7 +399,7 @@ class PlatformInfo:
 ⚙️ 配置确认
 ═══════════════════════════════════════════════════════
 
-当前管理目录：/Users/ze/Documents/kimi/skill/skill-install-project/
+当前管理目录：/Users/{username}/Documents/kimi/skill/skill-install-project/
 
 是否继续使用此目录？
   [Y] 是的，继续使用
@@ -432,7 +432,7 @@ class PlatformInfo:
 
 New-Item -ItemType SymbolicLink `
   -Path "$env:USERPROFILE\.kimi\skills\skill-installer" `
-  -Target "C:\Users\ze\skill-install-project\skill-installer"
+  -Target "C:\Users\{username}\skill-install-project\skill-installer"
 
 完成后按回车继续...
 ```

@@ -70,7 +70,7 @@ class PathManager:
         计算从软连接位置到源目录的相对路径
         
         例如：
-        - 源：/Users/ze/projects/skill-install-project/skill-installer
+        - 源：/Users/{username}/projects/skill-install-project/skill-installer
         - 软连接位置：~/.kimi/skills/skill-installer
         - 结果：../../projects/skill-install-project/skill-installer
         
