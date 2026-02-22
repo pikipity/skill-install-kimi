@@ -1,3 +1,8 @@
+---
+name: skill-installer
+description: 标准化安装、卸载、管理 Kimi CLI Skills 的工具。提供跨平台的 skill 管理能力，支持 macOS、Linux 和 Windows 系统。
+---
+
 # Skill Installer
 
 ## Description
