@@ -1,5 +1,8 @@
 """
 配置管理器 - 读写 skill-installer/data/config.json
+
+注意：本模块不包含任何 UI 交互代码。
+交互式配置引导已移至 cli_ui.py 的 ConfigSetupUI 类。
 """
 
 import json
@@ -27,6 +30,8 @@ class ConfigManager:
     
     配置文件位置: skill-installer/data/config.json
     首次使用前不存在，首次运行时创建
+    
+    注意：交互式配置引导已移至 cli_ui.ConfigSetupUI
     """
     
     CONFIG_FILENAME = "config.json"
@@ -49,7 +54,7 @@ class ConfigManager:
         self.data_dir = self.skill_dir / self.DATA_DIRNAME
         self.config_file = self.data_dir / self.CONFIG_FILENAME
         
-        # 启动时清理无效的配置文件（如 Kimi 检查完整性时创建的空文件）
+        # 启动时清理无效的配置文件
         self._cleanup_invalid_config()
         
         self._config: Optional[Dict[str, Any]] = None
@@ -254,115 +259,9 @@ class ConfigManager:
         
         return info
     
-    def interactive_setup(self, ui) -> bool:
-        """
-        交互式配置引导
-        
-        Args:
-            ui: 用户交互接口（需要实现 prompt, confirm 等方法）
-        
-        Returns:
-            是否成功配置
-        """
-        ui.print_header("⚙️ 初始配置")
-        
-        # 显示当前项目目录（使用 skill_dir 的父目录作为项目目录）
-        current_project = self.skill_dir.parent.resolve()
-        ui.print_info("【当前项目目录】")
-        ui.print(f"  {current_project}")
-        ui.print()
-        
-        # 提供选项
-        ui.print_info("【请选择管理目录】")
-        ui.print("  [A] 使用当前项目目录作为管理目录")
-        ui.print("  [B] 自定义管理目录")
-        ui.print()
-        
-        choice = ui.prompt("请选择", choices=["A", "B"])
-        
-        if choice == "A":
-            manager_dir = current_project
-        else:
-            # 自定义目录
-            while True:
-                custom_path = ui.prompt("请输入管理目录的绝对路径")
-                manager_dir = Path(custom_path).expanduser().resolve()
-                
-                if not manager_dir.is_absolute():
-                    ui.print_error("必须是绝对路径，请重新输入")
-                    continue
-                
-                if not manager_dir.exists():
-                    ui.print_error(f"目录不存在: {manager_dir}")
-                    create = ui.confirm(f"是否创建目录?", default=False)
-                    if create:
-                        try:
-                            manager_dir.mkdir(parents=True, exist_ok=True)
-                            ui.print_success(f"已创建目录: {manager_dir}")
-                            break
-                        except Exception as e:
-                            ui.print_error(f"创建目录失败: {e}")
-                    continue
-                
-                if not os.access(manager_dir, os.W_OK):
-                    ui.print_error(f"没有写入权限: {manager_dir}")
-                    continue
-                
-                break
-        
-        # 确认
-        ui.print_header("配置确认")
-        ui.print_info("您选择了：")
-        ui.print(f"  管理目录：{manager_dir}")
-        ui.print()
-        
-        if not ui.confirm("是否确认？", default=True):
-            ui.print_info("已取消配置")
-            return False
-        
-        # 保存配置
-        try:
-            self.set_manager_dir(manager_dir)
-            ui.print_success("✅ 配置已保存")
-            return True
-        except ConfigError as e:
-            ui.print_error(f"保存配置失败: {e}")
-            return False
-    
-    def interactive_confirm(self, ui) -> bool:
-        """
-        交互式确认当前配置
-        
-        Args:
-            ui: 用户交互接口
-        
-        Returns:
-            是否继续使用当前配置
-        """
-        ui.print_header("⚙️ 配置确认")
-        
-        try:
-            manager_dir = self.get_manager_dir()
-            ui.print_info(f"当前管理目录：{manager_dir}")
-            ui.print()
-            ui.print_info("是否继续使用此目录？")
-            ui.print("  [Y] 是的，继续使用")
-            ui.print("  [N] 更换管理目录")
-            ui.print()
-            
-            choice = ui.prompt("请选择", choices=["Y", "N"])
-            
-            if choice == "Y":
-                return True
-            else:
-                # 重新配置
-                self.reset()
-                return self.interactive_setup(ui)
-                
-        except ConfigError:
-            # 配置无效，重新配置
-            ui.print_warning("当前配置无效，需要重新配置")
-            return self.interactive_setup(ui)
+    # 注意：交互式方法已移至 cli_ui.ConfigSetupUI
+    # - interactive_setup(ui) -> cli_ui.ConfigSetupUI.interactive_setup(config)
+    # - interactive_confirm(ui) -> cli_ui.ConfigSetupUI.interactive_confirm(config)
 
 
 # 便捷函数

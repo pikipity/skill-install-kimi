@@ -687,6 +687,78 @@ python -m unittest tests.test_isolated -v
 
 ---
 
+### ~~TODO-4：架构重构 - Kimi 交互式 Skill + CLI 双模式~~ ✅ 已完成
+
+**完成日期**：2026-02-23
+
+**问题描述**：
+当前 skill-installer 被实现为纯 CLI 工具，用户必须通过 `@skill-installer install xxx` 命令使用。Kimi 无法介入交互流程，变成了单纯的命令转发器，失去了 Kimi skill 应有的交互式体验。
+
+**重构方案**（已全部完成）：
+
+| 序号 | 修改文件 | 状态 | 说明 |
+|------|----------|------|------|
+| 1 | `SKILL.md` | ✅ | 重写为交互指导文档，添加 `When to Use`、`Workflow`、`Available Tools` 章节 |
+| 2 | **新建** `src/api.py` | ✅ | 提供 Kimi 可直接调用的纯函数接口，返回结构化数据（`SetupStatus`, `SkillInfo`, `InstallPlan`, `InstallResult` 等） |
+| 3 | **新建** `src/cli_ui.py` | ✅ | 提取 CLI 专用的交互逻辑（`ConsoleUI`, `ConfigSetupUI`, `InstallUI`, `UninstallUI`） |
+| 4 | `src/cli.py` | ✅ | 改为基于 API 层的薄封装，不再直接操作 `core.py` |
+| 5 | `src/core.py` | ✅ | 移除 UI 相关代码（删除 `set_ui()`, `_confirm()`, `InstallPlan/UninstallPlan` 展示类），专注业务逻辑 |
+| 6 | `src/config.py` | ✅ | 移除交互式方法（`interactive_setup()`, `interactive_confirm()` 移至 `cli_ui.py`） |
+
+**新架构**：
+
+```
+Kimi 交互模式：
+用户说"安装 skill-pdf" → Kimi 读取 SKILL.md → api.validate_setup() 
+                                                ↓
+                       Kimi 控制交互流程 → api.generate_install_plan() → 展示方案
+                                                ↓
+                                        用户确认 → api.install_skill() → 返回结果
+
+CLI 模式（保留）：
+用户输入命令 → cli.py → cli_ui.py（交互）→ api.py → core.py
+```
+
+**新增 API（`skill_installer.api`）**：
+
+```python
+# 配置管理
+validate_setup() -> SetupStatus
+initialize_config(manager_dir) -> (bool, str)
+reset_config() -> bool
+
+# Skill 查询
+list_available_skills() -> List[SkillInfo]
+list_installed_skills() -> List[SkillInfo]
+get_skill_info(name) -> SkillInfo
+get_skill_detail(name) -> dict
+
+# 方案生成（展示给用户确认）
+generate_install_plan(name, option) -> InstallPlan
+generate_uninstall_plan(name) -> UninstallPlan
+
+# 执行操作
+install_skill(name, option) -> InstallResult
+uninstall_skill(name) -> UninstallResult
+```
+
+**文件结构变更**：
+```
+src/
+├── api.py          # ★ 新增：Kimi API 层（供 Kimi 调用）
+├── cli_ui.py       # ★ 新增：CLI 交互层（供终端使用）
+├── cli.py          # 修改：基于 API 的薄封装
+├── core.py         # 修改：移除 UI 代码，专注业务逻辑
+├── config.py       # 修改：移除交互式方法
+└── ...
+```
+
+**验证状态**：
+- ✅ 所有 Python 文件语法检查通过
+- ⏳ 功能测试待用户确认后执行
+
+---
+
 ## 八、开发检查清单
 
 在修改代码前，确认以下事项：

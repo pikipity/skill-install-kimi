@@ -1,160 +1,26 @@
 """
-命令行接口 - 处理用户交互和命令分发
+命令行接口 - 基于 API 层的终端交互封装
+
+CLI 模式入口，通过 cli_ui 处理交互，调用 api 执行操作。
 """
 
 import sys
 import argparse
 from pathlib import Path
-from typing import Optional, List, Any
+from typing import Optional, List
 
-from .config import ConfigManager, ConfigError, ConfigValidationError
-from .path_manager import PathManager
-from .core import SkillInstaller, InstallResult, UninstallResult, InstallOption
+# API 层
+from . import api
+
+# CLI UI 层
+from .cli_ui import (
+    ConsoleUI, ConfigSetupUI, 
+    InstallUI, UninstallUI
+)
+
+# 核心类型
+from .config import ConfigManager, ConfigError
 from .platform_utils import PlatformInfo
-
-
-class ConsoleUI:
-    """
-    控制台用户交互接口
-    
-    提供统一的交互方式，所有关键决策使用 [Y/n] 确认
-    """
-    
-    # 分隔线宽度
-    SEPARATOR_WIDTH = 55
-    
-    def __init__(self, input_func=None, output_func=None):
-        """
-        初始化 UI
-        
-        Args:
-            input_func: 输入函数（用于测试注入）
-            output_func: 输出函数（用于测试注入）
-        """
-        self._input = input_func or input
-        self._print = output_func or print
-    
-    def print(self, *args, **kwargs):
-        """打印输出"""
-        self._print(*args, **kwargs)
-    
-    def print_header(self, title: str):
-        """打印标题"""
-        self._print("")
-        self._print("═" * self.SEPARATOR_WIDTH)
-        self._print(title)
-        self._print("═" * self.SEPARATOR_WIDTH)
-    
-    def print_info(self, message: str):
-        """打印信息"""
-        self._print(message)
-    
-    def print_success(self, message: str):
-        """打印成功信息"""
-        self._print(f"✅ {message}")
-    
-    def print_error(self, message: str):
-        """打印错误信息"""
-        self._print(f"❌ {message}")
-    
-    def print_warning(self, message: str):
-        """打印警告信息"""
-        self._print(f"⚠️  {message}")
-    
-    def prompt(self, message: str, choices: Optional[List[str]] = None) -> str:
-        """
-        提示用户输入（必须有明确输入，禁止空输入使用默认）
-        
-        Args:
-            message: 提示消息
-            choices: 可选值列表
-        
-        Returns:
-            用户输入（已转大写）
-        """
-        prompt_str = f"{message}> "
-        
-        while True:
-            try:
-                user_input = self._input(prompt_str).strip()
-                
-                # 禁止空输入
-                if not user_input:
-                    self._print("请输入有效值")
-                    continue
-                
-                user_input = user_input.upper()
-                
-                # 验证可选值
-                if choices:
-                    if user_input in [c.upper() for c in choices]:
-                        return user_input
-                    self._print(f"无效输入，请选择: {', '.join(choices)}")
-                    continue
-                
-                return user_input
-                
-            except (EOFError, KeyboardInterrupt):
-                self._print("\n操作已取消")
-                sys.exit(0)
-    
-    def confirm(self, message: str, default: bool = True) -> bool:
-        """
-        Y/n 确认
-        
-        Args:
-            message: 提示消息
-            default: 默认值（True=Y, False=n）
-        
-        Returns:
-            用户是否确认
-        """
-        if default:
-            prompt_str = f"{message} [Y/n]："
-        else:
-            prompt_str = f"{message} [y/N]："
-        
-        while True:
-            try:
-                user_input = self._input(prompt_str).strip().lower()
-                
-                # 空输入使用默认值
-                if not user_input:
-                    return default
-                
-                if user_input in ['y', 'yes', '是']:
-                    return True
-                elif user_input in ['n', 'no', '否']:
-                    return False
-                else:
-                    self._print("请输入 Y 或 n")
-                    
-            except (EOFError, KeyboardInterrupt):
-                self._print("\n操作已取消")
-                sys.exit(0)
-    
-    def print_table(self, headers: List[str], rows: List[List[str]]):
-        """打印简单表格"""
-        if not rows:
-            self._print("  (无数据)")
-            return
-        
-        # 计算列宽
-        col_widths = [len(h) for h in headers]
-        for row in rows:
-            for i, cell in enumerate(row):
-                if i < len(col_widths):
-                    col_widths[i] = max(col_widths[i], len(str(cell)))
-        
-        # 打印表头
-        header_line = "  ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers))
-        self._print(header_line)
-        self._print("-" * len(header_line))
-        
-        # 打印行
-        for row in rows:
-            row_str = "  ".join(str(cell).ljust(col_widths[i]) for i, cell in enumerate(row))
-            self._print(row_str)
 
 
 class CLI:
@@ -163,8 +29,7 @@ class CLI:
     def __init__(self):
         self.ui = ConsoleUI()
         self.config: Optional[ConfigManager] = None
-        self.paths: Optional[PathManager] = None
-        self.installer: Optional[SkillInstaller] = None
+        self.config_ui: Optional[ConfigSetupUI] = None
     
     def init_config(self) -> bool:
         """
@@ -174,33 +39,25 @@ class CLI:
             是否成功
         """
         self.config = ConfigManager()
+        self.config_ui = ConfigSetupUI(self.ui)
         
         # 检查是否已配置
         if not self.config.is_configured:
             # 首次配置
-            if not self.config.interactive_setup(self.ui):
+            if not self.config_ui.interactive_setup(self.config):
                 self.ui.print_error("配置失败，无法继续")
                 return False
         else:
             # 确认现有配置
             try:
-                if not self.config.interactive_confirm(self.ui):
+                if not self.config_ui.interactive_confirm(self.config):
                     self.ui.print_error("配置无效，无法继续")
                     return False
             except ConfigError as e:
                 self.ui.print_error(f"配置错误: {e}")
                 return False
         
-        # 初始化路径管理器和安装器
-        try:
-            manager_dir = self.config.get_manager_dir()
-            self.paths = PathManager(manager_dir)
-            self.installer = SkillInstaller(self.config, self.paths)
-            self.installer.set_ui(self.ui)
-            return True
-        except Exception as e:
-            self.ui.print_error(f"初始化失败: {e}")
-            return False
+        return True
     
     def run(self, args: Optional[List[str]] = None) -> int:
         """
@@ -219,7 +76,11 @@ class CLI:
             parser.print_help()
             return 1
         
-        # 初始化配置
+        # config 命令不需要初始化配置
+        if parsed_args.command == "config":
+            return self._cmd_config(parsed_args)
+        
+        # 其他命令需要初始化配置
         if not self.init_config():
             return 1
         
@@ -231,8 +92,6 @@ class CLI:
                 return self._cmd_uninstall(parsed_args)
             elif parsed_args.command == "list":
                 return self._cmd_list(parsed_args)
-            elif parsed_args.command == "config":
-                return self._cmd_config(parsed_args)
             elif parsed_args.command == "info":
                 return self._cmd_info(parsed_args)
             else:
@@ -313,6 +172,8 @@ class CLI:
     
     def _cmd_install(self, args) -> int:
         """安装命令"""
+        skill_name = args.skill_name
+        
         # Windows 权限检查
         if PlatformInfo.is_windows() and not PlatformInfo.is_admin():
             self.ui.print_warning("Windows 创建软连接需要管理员权限")
@@ -327,50 +188,80 @@ class CLI:
             if choice == "C":
                 return 0
             elif choice == "B":
-                skill_name = args.skill_name
-                source = self.paths.get_skill_source_path(skill_name)
-                target = self.paths.get_skill_symlink_path(skill_name)
-                
-                self.ui.print_header("手动创建软连接指令")
-                self.ui.print_info("请以管理员身份打开 PowerShell，执行：")
-                self.ui.print()
-                self.ui.print(f'New-Item -ItemType SymbolicLink `')
-                self.ui.print(f'  -Path "{target}" `')
-                self.ui.print(f'  -Target "{source}"')
-                self.ui.print()
-                self.ui.print_info("或以管理员身份打开 CMD，执行：")
-                self.ui.print()
-                self.ui.print(f'mklink /D "{target}" "{source}"')
-                self.ui.print()
+                cmd_info = api.get_manual_symlink_command(skill_name)
+                if cmd_info:
+                    self.ui.print_header("手动创建软连接指令")
+                    self.ui.print_info("请以管理员身份打开 PowerShell，执行：")
+                    self.ui.print()
+                    self.ui.print(cmd_info['powershell'])
+                    self.ui.print()
+                    self.ui.print_info("或以管理员身份打开 CMD，执行：")
+                    self.ui.print()
+                    self.ui.print(cmd_info['cmd'])
+                    self.ui.print()
                 return 0
         
-        # 转换选项
-        option_map = {
-            "full": InstallOption.FULL,
-            "light": InstallOption.LIGHT,
-            "clone-only": InstallOption.CLONE_ONLY
-        }
-        option = option_map.get(args.option, InstallOption.FULL)
+        # 生成安装方案
+        plan = api.generate_install_plan(skill_name, args.option)
+        if not plan:
+            self.ui.print_error("配置未初始化")
+            return 1
+        
+        # 显示方案并交互
+        install_ui = InstallUI(self.ui)
+        install_ui.display_install_plan(plan)
+        
+        # 如果预检查失败，直接返回
+        if not plan.pre_check_passed:
+            return 1
+        
+        # 选择安装选项
+        choice = install_ui.prompt_install_option()
+        if choice == "D":
+            self.ui.print_info("已取消安装")
+            return 0
+        
+        # 映射选项
+        option_map = {"A": "full", "B": "light", "C": "clone-only"}
+        selected_option = option_map.get(choice, "full")
+        
+        # 二次确认
+        if not install_ui.confirm_install():
+            self.ui.print_info("已取消安装")
+            return 0
         
         # 执行安装
-        result = self.installer.install(args.skill_name, option)
-        
-        self.ui.print(result.format_display())
+        result = api.install_skill(skill_name, selected_option, skip_confirm=True)
+        install_ui.display_install_result(result)
         
         return 0 if result.success else 1
     
     def _cmd_uninstall(self, args) -> int:
         """卸载命令"""
-        result = self.installer.uninstall(args.skill_name)
+        skill_name = args.skill_name
         
-        self.ui.print(result.format_display())
+        # 生成卸载方案
+        plan = api.generate_uninstall_plan(skill_name)
+        if not plan:
+            self.ui.print_error("配置未初始化或 skill 不存在")
+            return 1
         
-        if result.success and result.preserved_paths:
-            self.ui.print()
-            self.ui.print_info("如需删除原始仓库，请执行以下命令：")
-            for path in result.preserved_paths:
-                cmd = self.installer.paths.get_delete_commands(args.skill_name).get('source', {}).get('command', '')
-                self.ui.print(f"  {cmd}")
+        # 显示方案并交互
+        uninstall_ui = UninstallUI(self.ui)
+        uninstall_ui.display_uninstall_plan(plan)
+        
+        # 如果预检查失败，直接返回
+        if not plan.pre_check_passed:
+            return 1
+        
+        # 确认卸载
+        if not uninstall_ui.confirm_uninstall():
+            self.ui.print_info("已取消卸载")
+            return 0
+        
+        # 执行卸载
+        result = api.uninstall_skill(skill_name, skip_confirm=True)
+        uninstall_ui.display_uninstall_result(result)
         
         return 0 if result.success else 1
     
@@ -381,17 +272,14 @@ class CLI:
         
         if show_installed:
             self.ui.print_header("📦 已安装的 Skills")
-            installed = self.installer.list_installed()
+            installed = api.list_installed_skills()
             
             if installed:
                 rows = []
                 for info in installed:
-                    status = "✅" if info['symlink_valid'] else "⚠️"
-                    rows.append([
-                        info['name'],
-                        status,
-                        str(info['source_path'])[:40] + "..." if len(str(info['source_path'])) > 40 else str(info['source_path'])
-                    ])
+                    status = "✅" if info.symlink_valid else "⚠️"
+                    source = info.source_path[:40] + "..." if len(info.source_path) > 40 else info.source_path
+                    rows.append([info.name, status, source])
                 self.ui.print_table(["名称", "状态", "源路径"], rows)
             else:
                 self.ui.print_info("  暂无已安装的 skill")
@@ -401,27 +289,29 @@ class CLI:
         
         if show_available:
             self.ui.print_header("📋 可安装的 Skills")
-            available = self.installer.list_available()
+            available = api.list_available_skills()
             
             if available:
                 rows = []
                 for info in available:
-                    valid = "✅" if info['source_valid'] else "❌"
-                    rows.append([
-                        info['name'],
-                        valid,
-                        str(info['source_path'])[:40] + "..." if len(str(info['source_path'])) > 40 else str(info['source_path'])
-                    ])
+                    valid = "✅" if info.source_valid else "❌"
+                    source = info.source_path[:40] + "..." if len(info.source_path) > 40 else info.source_path
+                    rows.append([info.name, valid, source])
                 self.ui.print_table(["名称", "有效", "源路径"], rows)
             else:
                 self.ui.print_info("  暂无可安装的 skill")
-                self.ui.print_info(f"\n  管理目录：{self.paths.manager_dir}")
+                if self.config:
+                    try:
+                        manager_dir = self.config.get_manager_dir()
+                        self.ui.print_info(f"\n  管理目录：{manager_dir}")
+                    except Exception:
+                        pass
         
         return 0
     
     def _cmd_info(self, args) -> int:
         """信息命令"""
-        info = self.installer.get_skill_info(args.skill_name)
+        info = api.get_skill_detail(args.skill_name)
         
         if not info:
             self.ui.print_error(f"Skill '{args.skill_name}' 不存在")
@@ -456,41 +346,45 @@ class CLI:
     
     def _cmd_config(self, args) -> int:
         """配置命令"""
+        config = ConfigManager()
+        
         if args.reset:
             if self.ui.confirm("确定要重置配置吗？这将删除配置文件", default=False):
-                self.config.reset()
-                self.ui.print_success("配置已重置")
-                # 重新配置
-                if self.config.interactive_setup(self.ui):
-                    self.ui.print_success("重新配置完成")
+                if api.reset_config():
+                    self.ui.print_success("配置已重置")
+                    # 重新配置
+                    config = ConfigManager()
+                    config_ui = ConfigSetupUI(self.ui)
+                    if config_ui.interactive_setup(config):
+                        self.ui.print_success("重新配置完成")
+                    else:
+                        self.ui.print_error("重新配置失败")
                 else:
-                    self.ui.print_error("重新配置失败")
+                    self.ui.print_error("重置配置失败")
             return 0
         
-        if args.show or not (args.reset):
-            self.ui.print_header("⚙️ 当前配置")
-            info = self.config.get_config_info()
+        # 显示配置
+        self.ui.print_header("⚙️ 当前配置")
+        info = api.get_config_info()
+        
+        self.ui.print_info("【路径信息】")
+        self.ui.print(f"  Skill 目录：{info['skill_dir']}")
+        self.ui.print(f"  配置文件：{info['config_file']}")
+        
+        self.ui.print()
+        self.ui.print_info("【配置状态】")
+        self.ui.print(f"  已配置：{'✅ 是' if info['is_configured'] else '❌ 否'}")
+        
+        if info['is_configured']:
+            self.ui.print(f"  管理目录：{info.get('manager_dir', 'N/A')}")
+            self.ui.print(f"  平台：{info.get('platform', 'N/A')}")
+            self.ui.print(f"  配置时间：{info.get('first_config_time', 'N/A')}")
+            self.ui.print(f"  配置版本：{info.get('version', 'N/A')}")
             
-            self.ui.print_info("【路径信息】")
-            self.ui.print(f"  Skill 目录：{info['skill_dir']}")
-            self.ui.print(f"  配置文件：{info['config_file']}")
-            
-            self.ui.print()
-            self.ui.print_info("【配置状态】")
-            self.ui.print(f"  已配置：{'✅ 是' if info['is_configured'] else '❌ 否'}")
-            
-            if info['is_configured']:
-                self.ui.print(f"  管理目录：{info.get('manager_dir', 'N/A')}")
-                self.ui.print(f"  平台：{info.get('platform', 'N/A')}")
-                self.ui.print(f"  配置时间：{info.get('first_config_time', 'N/A')}")
-                self.ui.print(f"  配置版本：{info.get('version', 'N/A')}")
-                
-                if 'is_valid' in info:
-                    self.ui.print(f"  配置有效：{'✅ 是' if info['is_valid'] else '❌ 否'}")
-                if 'validation_error' in info:
-                    self.ui.print(f"  验证错误：{info['validation_error']}")
-            
-            return 0
+            if 'is_valid' in info:
+                self.ui.print(f"  配置有效：{'✅ 是' if info['is_valid'] else '❌ 否'}")
+            if 'validation_error' in info:
+                self.ui.print(f"  验证错误：{info['validation_error']}")
         
         return 0
 
