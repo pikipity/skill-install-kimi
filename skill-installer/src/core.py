@@ -10,7 +10,7 @@ from enum import Enum
 from .config import ConfigManager, ConfigError
 from .path_manager import PathManager, PathManagerError
 from .validator import Validator, ValidationResult, ValidationStatus
-from .platform_utils import PlatformInfo, DeleteCommandGenerator
+from .platform_utils import PlatformInfo, PlatformUtils, DeleteCommandGenerator
 
 
 class InstallOption(Enum):
@@ -466,7 +466,7 @@ class SkillInstaller:
         if not PlatformInfo.is_windows():
             return None
         
-        if PlatformInfo.is_admin():
+        if PlatformUtils.is_admin():
             return None
         
         return (

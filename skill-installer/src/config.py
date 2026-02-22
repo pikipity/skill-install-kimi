@@ -236,8 +236,8 @@ class ConfigManager:
         """
         ui.print_header("⚙️ 初始配置")
         
-        # 显示当前项目目录
-        current_project = Path(__file__).parent.parent.parent.resolve()
+        # 显示当前项目目录（使用 skill_dir 的父目录作为项目目录）
+        current_project = self.skill_dir.parent.resolve()
         ui.print_info("【当前项目目录】")
         ui.print(f"  {current_project}")
         ui.print()

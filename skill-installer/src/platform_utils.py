@@ -192,7 +192,7 @@ class SymlinkManager:
     @staticmethod
     def _create_symlink_unix(source: Path, target: Path) -> None:
         """Unix-like 系统创建软连接"""
-        target.symlink_to(source, target_is_dir=source.is_dir())
+        target.symlink_to(source, target_is_directory=source.is_dir())
     
     @staticmethod
     def _create_symlink_windows(source: Path, target: Path) -> None:

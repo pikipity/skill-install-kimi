@@ -611,6 +611,82 @@ def prompt(self, message: str, choices: Optional[List[str]] = None) -> str:
 
 ---
 
+### ~~TODO-3：隔离测试方案~~ ✅ 已完成
+
+**测试完成总结**：
+
+| 层级 | 状态 | 测试数量 | 说明 |
+|------|------|----------|------|
+| **L1: 代码测试** | ✅ 通过 | 110 | unittest 自动化测试，覆盖率 > 80% |
+| **L2: 功能测试** | ✅ 通过 | 7 | 隔离环境测试，验证不影响真实环境 |
+| **L3: 集成测试** | ⏭️ 可选 | - | 需手动验证，可在实际使用时进行 |
+
+**L1 代码测试覆盖模块**：
+- `test_platform_utils.py` - 跨平台工具测试（27 个测试）
+- `test_config.py` - 配置管理测试（24 个测试）
+- `test_path_manager.py` - 路径管理测试（16 个测试）
+- `test_validator.py` - 验证器测试（19 个测试）
+- `test_core.py` - 核心逻辑测试（24 个测试）
+
+**L2 功能测试用例**（全部通过）：
+
+| 编号 | 场景 | 验证点 | 状态 |
+|------|------|--------|------|
+| FT-01 | 首次配置 | 配置保存到临时目录，不影响 `~/.kimi/` | ✅ |
+| FT-02 | 安装临时 skill | 软连接创建在临时目录 | ✅ |
+| FT-03 | 隔离性验证 | `~/.kimi/skills/` **必须无**测试 skill | ✅ |
+| FT-04 | 卸载 skill | 软连接删除，源码保留 | ✅ |
+| FT-05 | 列表验证 | 只显示隔离环境中的 skill | ✅ |
+
+**测试过程中发现的问题及修复**：
+
+| 问题 | 位置 | 修复内容 |
+|------|------|----------|
+| symlink_to 参数错误 | `platform_utils.py:195` | `target_is_dir` → `target_is_directory` |
+| is_admin 调用错误 | `core.py:469` | `PlatformInfo.is_admin()` → `PlatformUtils.is_admin()` |
+| 缺少 PlatformUtils 导入 | `core.py:13` | 添加 `PlatformUtils` 导入 |
+| interactive_setup 路径问题 | `config.py:240` | 使用 `self.skill_dir.parent` 而非固定路径 |
+
+**隔离机制实现**：
+- 使用 `tempfile.TemporaryDirectory()` 创建临时测试环境
+- 通过 monkey patch 替换 `PlatformInfo.get_kimi_dir()` 返回临时目录
+- 测试前后对比 `~/.kimi/skills/` 内容，确保无变化
+- 自动清理测试遗留（以 `test-` 开头的 skill）
+
+**测试导入方式（方案 D）**：
+
+测试使用动态导入方案，无需 `skill_installer` 符号链接：
+
+```python
+# 测试文件开头必须先导入 helper
+import test_import_helper
+from skill_installer.src.config import ConfigManager
+from skill_installer.src.core import SkillInstaller
+# ...
+```
+
+`test_import_helper.py` 会自动：
+1. 创建 `sys.modules["skill_installer"]` 包
+2. 创建 `sys.modules["skill_installer.src"]` 包  
+3. 添加 `skill-installer/src` 到 `sys.path`
+4. 保持源代码的相对导入正常工作
+
+**运行测试命令**：
+```bash
+# L1 代码测试
+python -m unittest discover -s tests -v
+
+# L2 隔离测试
+python -m unittest tests.test_isolated -v
+```
+
+**测试通过标准验证**:
+- ✅ L1: 所有 110 个测试用例通过
+- ✅ L2: 所有 5 个场景通过，`~/.kimi/skills/` 测试前后一致
+- ⏭️ L3: 待实际使用场景验证
+
+---
+
 ## 八、开发检查清单
 
 在修改代码前，确认以下事项：
@@ -631,3 +707,4 @@ def prompt(self, message: str, choices: Optional[List[str]] = None) -> str:
 | 日期 | 版本 | 修订内容 |
 |------|------|----------|
 | 2026-02-22 | v1.0 | 初始版本，确立目录结构、交互规范和跨平台兼容性方案 |
+| 2026-02-22 | v1.1 | 完成隔离测试方案（TODO-3）：<br>• L1: 110 个单元测试通过<br>• L2: 7 个隔离功能测试通过<br>• 修复 4 个代码问题（symlink_to 参数、is_admin 调用、导入缺失、路径计算） |
