@@ -33,3 +33,6 @@ ENV/
 *.swo
 *~
 .DS_Store
+
+# skill-installer data
+skill-installer/data/

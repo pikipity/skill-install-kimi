@@ -32,7 +32,10 @@ class ConsoleUI:
     
     def print(self, *args, **kwargs):
         """打印输出"""
-        self._print(*args, **kwargs)
+        if args:
+            self._print(*args, **kwargs)
+        else:
+            self._print("")
     
     def print_header(self, title: str):
         """打印标题"""
