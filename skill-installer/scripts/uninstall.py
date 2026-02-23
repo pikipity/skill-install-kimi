@@ -53,7 +53,6 @@ def main():
         return 1
     
     try:
-        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         from path_manager import PathManager
         
         paths = PathManager(config.get_manager_dir())
@@ -65,12 +64,12 @@ def main():
         output = {
             "success": result.success,
             "skill_name": args.skill,
-            "symlink_path": str(result.symlink_path) if result.symlink_path else None,
+            "symlink_path": str(result.deleted_symlink) if result.deleted_symlink else None,
             "message": result.message if result.message else ("卸载成功" if result.success else "卸载失败")
         }
         
-        if not result.success and result.error:
-            output["error"] = result.error
+        if not result.success:
+            output["error"] = result.message
         
         print(json.dumps(output, indent=2, ensure_ascii=False))
         return 0 if result.success else 1

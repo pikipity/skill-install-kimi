@@ -77,8 +77,6 @@ def main():
         return 1
     
     try:
-        # 添加 path_manager 到路径
-        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         from path_manager import PathManager
         
         paths = PathManager(config.get_manager_dir())

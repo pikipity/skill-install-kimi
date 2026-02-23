@@ -41,6 +41,33 @@ class PathManager:
         # 确保 Kimi skills 目录存在
         PlatformUtils.ensure_dir(self.kimi_skills_dir)
     
+    def find_skill_source(self, skill_name: str) -> Optional[Path]:
+        """
+        在管理目录下递归查找 skill 源目录
+        支持扁平结构和嵌套结构
+        
+        Args:
+            skill_name: skill 名称
+            
+        Returns:
+            skill 源路径，未找到返回 None
+        """
+        # 先尝试扁平结构
+        flat_path = self.manager_dir / skill_name
+        if (flat_path / "SKILL.md").exists():
+            return flat_path
+        
+        # 递归查找嵌套结构
+        try:
+            for item in self.manager_dir.rglob("*"):
+                if item.is_dir() and item.name == skill_name:
+                    if (item / "SKILL.md").exists():
+                        return item
+        except Exception:
+            pass
+        
+        return None
+    
     def get_skill_source_path(self, skill_name: str) -> Path:
         """
         获取 skill 的源路径（原始仓库位置）
@@ -87,7 +114,7 @@ class PathManager:
     
     def is_skill_installed(self, skill_name: str) -> bool:
         """
-        检查 skill 是否已安装（软连接是否存在且有效）
+        检查 skill 是否已安装（软连接/目录联接是否存在且有效）
         
         Args:
             skill_name: skill 名称
@@ -97,19 +124,20 @@ class PathManager:
         """
         symlink_path = self.get_skill_symlink_path(skill_name)
         
-        if not symlink_path.exists() and not symlink_path.is_symlink():
+        if not symlink_path.exists():
             return False
         
-        # 检查是否为软连接且指向正确位置
-        if symlink_path.is_symlink():
-            try:
-                target = symlink_path.resolve()
-                expected_source = self.get_skill_source_path(skill_name)
-                return target == expected_source
-            except Exception:
+        # 检查是否为链接（软连接或目录联接）
+        try:
+            target = symlink_path.resolve()
+            # 如果解析后的路径与原始路径不同，说明是链接
+            if target == symlink_path:
                 return False
-        
-        return False
+            
+            # 验证目标是有效 skill 目录（有 SKILL.md 即可，不检查位置）
+            return (target / "SKILL.md").exists()
+        except Exception:
+            return False
     
     def get_installed_skills(self) -> List[str]:
         """
@@ -124,14 +152,16 @@ class PathManager:
             return installed
         
         for item in self.kimi_skills_dir.iterdir():
-            if item.is_symlink():
-                # 验证是否指向管理目录下的 skill
-                try:
-                    target = item.resolve()
-                    if str(target).startswith(str(self.manager_dir)):
-                        installed.append(item.name)
-                except Exception:
-                    pass
+            try:
+                # 尝试解析（软连接或目录联接都能解析）
+                target = item.resolve()
+                
+                # 是链接且指向有效 skill 目录（有 SKILL.md）
+                if target != item and (target / "SKILL.md").exists():
+                    installed.append(item.name)
+                    
+            except Exception:
+                pass
         
         return installed
     
@@ -181,23 +211,30 @@ class PathManager:
         
         return True, ""
     
-    def create_skill_symlink(self, skill_name: str) -> None:
+    def create_skill_symlink(self, skill_name: str, source_path: Path = None) -> None:
         """
         创建 skill 的软连接
         
         Args:
             skill_name: skill 名称
+            source_path: 可选，指定源路径（支持嵌套结构）
         
         Raises:
             PathManagerError: 创建失败
         """
-        source = self.get_skill_source_path(skill_name)
+        # 【关键】使用传入的源路径或查找嵌套结构
+        if source_path is None:
+            source_path = self.find_skill_source(skill_name)
+        if source_path is None:
+            source_path = self.get_skill_source_path(skill_name)
+        
         target = self.get_skill_symlink_path(skill_name)
         
         # 验证源存在
-        valid, error = self.validate_skill_source(skill_name)
-        if not valid:
-            raise PathManagerError(error)
+        if not source_path.exists():
+            raise PathManagerError(f"Skill 源目录不存在: {source_path}")
+        if not (source_path / "SKILL.md").exists():
+            raise PathManagerError(f"无效的 skill 目录（缺少 SKILL.md）: {source_path}")
         
         # 检查是否已安装
         if self.is_skill_installed(skill_name):

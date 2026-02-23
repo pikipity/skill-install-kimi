@@ -39,7 +39,7 @@ def main():
     # 检查配置状态
     result = {
         "configured": config_manager.is_configured,
-        "manager_dir": str(config_manager.manager_dir) if config_manager.is_configured else None,
+        "manager_dir": str(config_manager.get_manager_dir()) if config_manager.is_configured else None,
         "platform": platform_name,
         "is_admin": is_admin,
         "error": None
@@ -48,7 +48,7 @@ def main():
     # 如果已配置但无效，添加错误信息
     if config_manager.is_configured:
         try:
-            config = config_manager.load_config()
+            config = config_manager.load()
             if not config:
                 result["configured"] = False
                 result["error"] = "配置文件无效"

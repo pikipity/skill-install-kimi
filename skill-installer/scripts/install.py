@@ -56,7 +56,6 @@ def main():
         return 1
     
     try:
-        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         from path_manager import PathManager
         
         paths = PathManager(config.get_manager_dir())
@@ -73,16 +72,21 @@ def main():
         # 执行安装
         result = installer.install(args.skill, option)
         
+        # 【关键】递归查找 skill 源目录（支持嵌套结构）
+        source_path = paths.find_skill_source(args.skill)
+        if source_path is None:
+            source_path = paths.get_skill_source_path(args.skill)
+        
         output = {
             "success": result.success,
             "skill_name": args.skill,
-            "source_path": str(result.source_path) if result.source_path else None,
+            "source_path": str(source_path),
             "symlink_path": str(result.symlink_path) if result.symlink_path else None,
             "message": result.message if result.message else ("安装成功" if result.success else "安装失败")
         }
         
-        if not result.success and result.error:
-            output["error"] = result.error
+        if not result.success:
+            output["error"] = result.message
         
         print(json.dumps(output, indent=2, ensure_ascii=False))
         return 0 if result.success else 1

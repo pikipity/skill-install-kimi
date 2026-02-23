@@ -113,7 +113,11 @@ class SkillInstaller:
         Returns:
             安装结果
         """
-        source_path = self.paths.get_skill_source_path(skill_name)
+        # 【关键】递归查找 skill 源目录（支持嵌套结构）
+        source_path = self.paths.find_skill_source(skill_name)
+        if source_path is None:
+            source_path = self.paths.get_skill_source_path(skill_name)
+        
         symlink_path = self.paths.get_skill_symlink_path(skill_name)
         
         # 1. 安装前检查
@@ -129,9 +133,9 @@ class SkillInstaller:
                 validation_results=pre_checks
             )
         
-        # 2. 执行安装（创建软连接）
+        # 2. 执行安装（创建软连接，传入实际源路径支持嵌套结构）
         try:
-            self.paths.create_skill_symlink(skill_name)
+            self.paths.create_skill_symlink(skill_name, source_path)
         except PathManagerError as e:
             return InstallResult(
                 success=False,
@@ -180,8 +184,12 @@ class SkillInstaller:
         Returns:
             卸载结果
         """
-        source_path = self.paths.get_skill_source_path(skill_name)
+        # 【关键】从软连接解析实际源路径（支持嵌套结构）
         symlink_path = self.paths.get_skill_symlink_path(skill_name)
+        try:
+            source_path = symlink_path.resolve()
+        except Exception:
+            source_path = self.paths.get_skill_source_path(skill_name)
         
         # 1. 卸载前检查
         pre_checks = Validator.run_pre_uninstall_checks(symlink_path)

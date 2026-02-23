@@ -40,9 +40,15 @@ from platform_utils import PlatformInfo, PlatformUtils
 def generate_install_plan(skill_name, option, config, paths):
     """生成安装方案"""
     from core import InstallOption
+    from platform_utils import PlatformUtils
     
-    source_path = paths.get_skill_source_path(skill_name)
-    symlink_path = paths.get_symlink_path(skill_name)
+    # 【关键】在管理目录下递归查找 skill（支持嵌套结构）
+    source_path = paths.find_skill_source(skill_name)
+    if source_path is None:
+        # 未找到，使用默认路径用于错误提示
+        source_path = paths.get_skill_source_path(skill_name)
+    
+    symlink_path = paths.get_skill_symlink_path(skill_name)
     
     # 检查是否需要管理员权限（Windows）
     platform = PlatformInfo.get_system()
@@ -61,12 +67,15 @@ def generate_install_plan(skill_name, option, config, paths):
     if not source_path.exists():
         errors.append(f"Skill 源目录不存在: {source_path}")
     
+    # 计算相对路径（使用实际找到的源路径）
+    relative_path = PlatformUtils.calculate_relative_path(source_path, symlink_path.parent)
+    
     return {
         "action": "install",
         "skill_name": skill_name,
         "source_path": str(source_path),
         "symlink_path": str(symlink_path),
-        "relative_path": paths.get_relative_path(source_path, symlink_path.parent),
+        "relative_path": relative_path,
         "option": option,
         "requires_admin": requires_admin,
         "windows_manual_command": windows_manual_command,
@@ -77,8 +86,14 @@ def generate_install_plan(skill_name, option, config, paths):
 
 def generate_uninstall_plan(skill_name, config, paths):
     """生成卸载方案"""
-    source_path = paths.get_skill_source_path(skill_name)
-    symlink_path = paths.get_symlink_path(skill_name)
+    symlink_path = paths.get_skill_symlink_path(skill_name)
+    
+    # 关键：从软连接解析实际源路径（支持任意嵌套结构）
+    try:
+        source_path = symlink_path.resolve()
+    except Exception:
+        # 备用：使用默认路径
+        source_path = paths.get_skill_source_path(skill_name)
     
     # 生成各平台的删除命令
     delete_commands = {
@@ -87,11 +102,12 @@ def generate_uninstall_plan(skill_name, config, paths):
         "windows": f'Remove-Item -Recurse -Force "{symlink_path}"'
     }
     
-    # 预检查
+    # 预检查：验证软连接存在且是有效 skill
     errors = []
-    info = paths.get_install_info(skill_name)
-    if not info.get('is_installed', False):
+    if not symlink_path.exists():
         errors.append(f"Skill 未安装: {skill_name}")
+    elif not (source_path / "SKILL.md").exists():
+        errors.append(f"无效的 skill 目录: {skill_name}")
     
     return {
         "action": "uninstall",
@@ -119,7 +135,6 @@ def main():
         return 1
     
     try:
-        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         from path_manager import PathManager
         
         paths = PathManager(config.get_manager_dir())

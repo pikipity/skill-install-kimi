@@ -1323,6 +1323,35 @@ CLI 模式：  用户命令 → cli.py → cli_ui.py → api.py → core.py
 
 ---
 
+### TODO-14：修复脚本 Bug
+
+**问题来源**：实际使用中发现脚本存在 Bug
+
+**问题清单**：
+
+| 文件 | 行号 | 问题 | 原因 |
+|------|------|------|------|
+| `check_config.py` | 42 | `config_manager.manager_dir` 属性不存在 | `ConfigManager` 只有 `get_manager_dir()` 方法 |
+| `check_config.py` | 51 | `config_manager.load_config()` 方法不存在 | 应为 `load()` 方法 |
+| `list_skills.py` | 81 | 从 `src/` 导入 `PathManager` | `path_manager` 已在 `lib/` 下，不应从废弃的 `src/` 导入 |
+| `generate_plan.py` | 122 | 从 `src/` 导入 `PathManager` | 同上 |
+| `install.py` | 59 | 从 `src/` 导入 `PathManager` | 同上 |
+| `uninstall.py` | 56 | 从 `src/` 导入 `PathManager` | 同上 |
+
+**任务清单**：
+
+| 序号 | 任务 | 状态 | 说明 |
+|------|------|------|------|
+| 1 | 修复 `check_config.py` 第42行 | ✅ 已完成 | `manager_dir` → `get_manager_dir()` |
+| 2 | 修复 `check_config.py` 第51行 | ✅ 已完成 | `load_config()` → `load()` |
+| 3 | 修复 `list_skills.py` 导入 | ✅ 已完成 | 移除 `src/` 导入，直接使用 `lib/` |
+| 4 | 修复 `generate_plan.py` 导入 | ✅ 已完成 | 移除 `src/` 导入 |
+| 5 | 修复 `install.py` 导入 | ✅ 已完成 | 移除 `src/` 导入 |
+| 6 | 修复 `uninstall.py` 导入 | ✅ 已完成 | 移除 `src/` 导入 |
+| 7 | 重新测试 | ✅ 已完成 | check_config.py 测试通过 |
+
+---
+
 ## 十、修订记录
 
 | 日期 | 版本 | 修订内容 |
@@ -1332,3 +1361,4 @@ CLI 模式：  用户命令 → cli.py → cli_ui.py → api.py → core.py
 | 2026-02-23 | v2.0 | 架构调整为纯 Kimi 交互式（TODO-10）：<br>• SKILL.md 重写为 Kimi 交互工作流<br>• README.md 重写为用户导向说明<br>• AGENTS.md 新增"架构演进"章节<br>• CLI 代码保留但不使用<br>• 跨平台支持通过 SKILL.md 指导 Kimi 实现 |
 | 2026-02-23 | v2.1 | 首次配置流程完善（TODO-11）：<br>• 修复 `is_configured` 不验证内容有效性的问题<br>• `validate_setup()` 返回详细错误信息<br>• 空文件/无效JSON/缺少字段均触发重新配置 |
 | 2026-02-23 | v3.0 | 架构重构为脚本调用（TODO-12 + TODO-13）：<br>• 创建 scripts/ 目录，6 个核心脚本<br>• 重写 SKILL.md 为脚本调用工作流<br>• 解决 `ModuleNotFoundError` 导入问题<br>• L1-L5 测试全部通过，实际环境验证成功 |
+| 2026-02-23 | v3.1 | Bug 修复（TODO-14）：<br>• 修复 `check_config.py` 调用不存在属性和方法的问题<br>• 修复 4 个脚本从废弃 `src/` 导入的问题<br>• 脚本现已可正常使用 |
