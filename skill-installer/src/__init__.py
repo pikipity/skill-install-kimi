@@ -1,11 +1,20 @@
 """
-skill-installer: 标准化安装、卸载、管理 Kimi CLI Skills 的工具
+DEPRECATED: 此目录下的代码已废弃
+
+请使用 scripts/ 目录下的命令行脚本代替：
+    - scripts/check_config.py
+    - scripts/init_config.py
+    - scripts/list_skills.py
+    - scripts/generate_plan.py
+    - scripts/install.py
+    - scripts/uninstall.py
+
+保留原因：
+    - 向后兼容参考
+    - 可能包含有用的实现细节
+
+请勿直接导入使用，会导致 ModuleNotFoundError。
 """
 
 __version__ = "1.0.0"
-
-# 导出 API 模块（供 Kimi 交互式调用）
-try:
-    from . import api
-except ImportError:
-    pass  # 避免循环导入问题
+__deprecated__ = True

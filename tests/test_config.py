@@ -1,192 +1,110 @@
 """
-配置管理测试 - L1 代码测试
+配置管理测试 - L1 代码测试（脚本架构版）
+测试 scripts/check_config.py 和 init_config.py
 """
 
 import unittest
-import sys
+import subprocess
 import json
 import tempfile
 import shutil
+import sys
 from pathlib import Path
-from unittest.mock import MagicMock
-
-# 方案 D：动态导入设置（必须先导入 helper）
-# 确保 tests 目录在路径中
-sys.path.insert(0, str(Path(__file__).parent))
-import test_import_helper
-from skill_installer.src.config import ConfigManager, ConfigError, ConfigValidationError
 
 
-class TestConfigManager(unittest.TestCase):
-    """测试 ConfigManager 类"""
+class TestScriptsConfig(unittest.TestCase):
+    """测试脚本配置功能"""
     
     def setUp(self):
-        """创建临时目录"""
+        """设置测试环境"""
+        self.project_root = Path(__file__).parent.parent
+        self.scripts_dir = self.project_root / "skill-installer" / "scripts"
         self.tmp_dir = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, self.tmp_dir)
+        self.addCleanup(shutil.rmtree, self.tmp_dir, ignore_errors=True)
+    
+    def run_script(self, script_name, args=None, cwd=None):
+        """运行脚本并返回结果"""
+        script_path = self.scripts_dir / script_name
+        cmd = [sys.executable, str(script_path)]
+        if args:
+            cmd.extend(args)
         
-        # 模拟 skill-installer 目录结构
-        self.skill_dir = self.tmp_dir / 'skill-installer'
-        self.skill_dir.mkdir()
+        # 使用临时目录作为工作目录（隔离）
+        if cwd is None:
+            cwd = self.tmp_dir
         
-        self.config_manager = ConfigManager(self.skill_dir)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=str(cwd)
+        )
+        
+        # 尝试解析 JSON
+        try:
+            output = json.loads(result.stdout) if result.stdout else {}
+        except json.JSONDecodeError:
+            output = {"raw": result.stdout, "stderr": result.stderr}
+        
+        return result.returncode, output, result.stderr
     
-    def test_init_default_path(self):
-        """测试默认路径初始化"""
-        cm = ConfigManager()
-        # 应该指向 skill-installer 目录
-        self.assertTrue(str(cm.skill_dir).endswith('skill-installer'))
-    
-    def test_init_custom_path(self):
-        """测试自定义路径初始化"""
-        cm = ConfigManager(self.skill_dir)
-        self.assertEqual(cm.skill_dir.resolve(), self.skill_dir.resolve())
-        self.assertEqual(cm.data_dir, cm.skill_dir / 'data')
-        self.assertEqual(cm.config_file, cm.data_dir / 'config.json')
-    
-    def test_is_configured_false(self):
+    def test_check_config_not_configured(self):
         """测试未配置状态"""
-        self.assertFalse(self.config_manager.is_configured)
-    
-    def test_is_configured_true(self):
-        """测试已配置状态"""
-        # 创建配置文件
-        self.config_manager.data_dir.mkdir(exist_ok=True)
-        config = {'manager_dir': str(self.tmp_dir), 'version': '1.0'}
-        self.config_manager.config_file.write_text(json.dumps(config))
+        code, output, stderr = self.run_script("check_config.py")
         
-        self.assertTrue(self.config_manager.is_configured)
+        self.assertFalse(output.get("configured", True))
+        self.assertIn("platform", output)
+        self.assertIn("is_admin", output)
     
-    def test_load_not_exists(self):
-        """测试加载不存在的配置"""
-        with self.assertRaises(ConfigError) as ctx:
-            self.config_manager.load()
-        self.assertIn('不存在', str(ctx.exception))
-    
-    def test_load_invalid_json(self):
-        """测试加载无效 JSON"""
-        self.config_manager.data_dir.mkdir(exist_ok=True)
-        self.config_manager.config_file.write_text('invalid json')
+    def test_init_config_success(self):
+        """测试初始化配置成功"""
+        manager_dir = self.tmp_dir / "manager"
+        manager_dir.mkdir()
         
-        with self.assertRaises(ConfigError) as ctx:
-            self.config_manager.load()
-        self.assertIn('格式错误', str(ctx.exception))
-    
-    def test_save_and_load(self):
-        """测试保存和加载配置"""
-        config = {
-            'manager_dir': str(self.tmp_dir),
-            'platform': 'macos',
-            'first_config_time': '2024-01-01T00:00:00'
-        }
+        code, output, stderr = self.run_script(
+            "init_config.py",
+            ["--dir", str(manager_dir)]
+        )
         
-        self.config_manager.save(config)
+        self.assertTrue(output.get("success", False))
+        self.assertEqual(output.get("manager_dir"), str(manager_dir))
+    
+    def test_init_config_invalid_path(self):
+        """测试无效路径"""
+        code, output, stderr = self.run_script(
+            "init_config.py",
+            ["--dir", "C:\\不存在的路径\\12345"]
+        )
         
-        # 验证文件创建
-        self.assertTrue(self.config_manager.config_file.exists())
+        self.assertFalse(output.get("success", True))
+        self.assertIn("error", output)
+    
+    def test_full_config_flow(self):
+        """测试完整配置流程（简化版）"""
+        import shutil
         
-        # 验证内容
-        loaded = self.config_manager.load()
-        self.assertEqual(loaded['manager_dir'], str(self.tmp_dir))
-        self.assertEqual(loaded['version'], '1.0')  # 自动添加版本
-    
-    def test_validate_missing_manager_dir(self):
-        """测试缺少 manager_dir 的验证"""
-        config = {'platform': 'macos'}
-        valid, error = self.config_manager.validate(config)
-        self.assertFalse(valid)
-        self.assertIn('manager_dir', error)
-    
-    def test_validate_not_absolute_path(self):
-        """测试非绝对路径验证"""
-        config = {'manager_dir': 'relative/path'}
-        valid, error = self.config_manager.validate(config)
-        self.assertFalse(valid)
-        self.assertIn('绝对路径', error)
-    
-    def test_validate_not_exists(self):
-        """测试不存在的目录验证"""
-        config = {'manager_dir': '/not/exist/path'}
-        valid, error = self.config_manager.validate(config)
-        self.assertFalse(valid)
-        # 错误消息可能是 "管理目录不存在" 或 "必须是绝对路径"（Windows 对 /path 的处理）
-        self.assertTrue('不存在' in error or '绝对路径' in error, f"错误消息: {error}")
-    
-    def test_validate_valid(self):
-        """测试有效配置验证"""
-        config = {'manager_dir': str(self.tmp_dir)}
-        valid, error = self.config_manager.validate(config)
-        self.assertTrue(valid)
-        self.assertEqual(error, '')
-    
-    def test_get_manager_dir_not_loaded(self):
-        """测试未加载时获取管理目录"""
-        # 先保存一个有效配置
-        self.config_manager.save({'manager_dir': str(self.tmp_dir)})
+        # 使用真实项目目录进行测试
+        manager_dir = self.tmp_dir / "manager"
+        manager_dir.mkdir()
         
-        # 新的实例，未显式 load
-        cm = ConfigManager(self.skill_dir)
-        path = cm.get_manager_dir()
-        self.assertEqual(path, self.tmp_dir)
-    
-    def test_set_manager_dir(self):
-        """测试设置管理目录"""
-        self.config_manager.set_manager_dir(self.tmp_dir)
+        # 步骤1: 初始化配置
+        code, output, _ = self.run_script(
+            "init_config.py",
+            ["--dir", str(manager_dir)]
+        )
+        self.assertTrue(output.get("success"), f"初始化失败: {output}")
         
-        # 验证配置保存
-        self.assertTrue(self.config_manager.config_file.exists())
+        # 步骤2: 验证配置文件已创建
+        config_file = self.project_root / "skill-installer" / "data" / "config.json"
+        self.assertTrue(config_file.exists(), "配置文件未创建")
         
-        loaded = self.config_manager.load()
-        self.assertEqual(Path(loaded['manager_dir']).resolve(), self.tmp_dir.resolve())
-        self.assertIn('first_config_time', loaded)
-        self.assertIn('platform', loaded)
-    
-    def test_set_manager_dir_not_absolute(self):
-        """测试设置不存在的路径"""
-        with self.assertRaises(ConfigValidationError) as ctx:
-            self.config_manager.set_manager_dir('/not/exist/path')
-        self.assertIn('不存在', str(ctx.exception))
-    
-    def test_set_manager_dir_not_exists(self):
-        """测试设置不存在的目录"""
-        with self.assertRaises(ConfigValidationError) as ctx:
-            self.config_manager.set_manager_dir('/not/exist')
-        self.assertIn('不存在', str(ctx.exception))
-    
-    def test_reset(self):
-        """测试重置配置"""
-        # 先创建配置
-        self.config_manager.save({'manager_dir': str(self.tmp_dir)})
-        self.assertTrue(self.config_manager.config_file.exists())
-        
-        # 重置
-        self.config_manager.reset()
-        self.assertFalse(self.config_manager.config_file.exists())
-        self.assertIsNone(self.config_manager._config)
-    
-    def test_get_config_info_not_configured(self):
-        """测试获取未配置时的信息"""
-        info = self.config_manager.get_config_info()
-        
-        self.assertEqual(Path(info['skill_dir']).resolve(), self.skill_dir.resolve())
-        self.assertEqual(info['is_configured'], False)
-        self.assertIn('config_file', info)
-    
-    def test_get_config_info_configured(self):
-        """测试获取已配置时的信息"""
-        self.config_manager.set_manager_dir(self.tmp_dir)
-        
-        info = self.config_manager.get_config_info()
-        
-        self.assertEqual(info['is_configured'], True)
-        self.assertEqual(Path(info['manager_dir']).resolve(), self.tmp_dir.resolve())
-        self.assertIn('platform', info)
-        self.assertIn('first_config_time', info)
-        self.assertIn('version', info)
+        # 清理：删除测试配置
+        if config_file.exists():
+            config_file.unlink()
+        data_dir = config_file.parent
+        if data_dir.exists():
+            data_dir.rmdir()
 
 
-# 注意：交互式配置测试已移至 tests/test_cli_l2.py
-# ConfigSetupUI 类现在位于 cli_ui.py，交互逻辑与 ConfigManager 分离
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main(verbosity=2)
