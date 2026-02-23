@@ -241,7 +241,7 @@ class PathManager:
             raise PathManagerError(f"Skill '{skill_name}' 已安装")
         
         try:
-            SymlinkManager.create_symlink(source, target)
+            SymlinkManager.create_symlink(source_path, target)
         except PermissionError as e:
             raise PathManagerError(f"权限不足: {e}")
         except Exception as e:
