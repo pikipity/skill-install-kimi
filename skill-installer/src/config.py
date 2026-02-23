@@ -87,9 +87,20 @@ class ConfigManager:
     @property
     def is_configured(self) -> bool:
         """是否已配置（配置文件存在且有效）"""
-        # 先清理无效文件
+        # 先清理无效文件（空文件等）
         self._cleanup_invalid_config()
-        return self.config_file.exists()
+        
+        if not self.config_file.exists():
+            return False
+        
+        # 验证配置内容是否有效
+        try:
+            config = self.load()
+            valid, _ = self.validate(config)
+            return valid
+        except ConfigError:
+            # 配置文件无效（损坏的JSON或缺少关键字段）
+            return False
     
     def load(self) -> Dict[str, Any]:
         """

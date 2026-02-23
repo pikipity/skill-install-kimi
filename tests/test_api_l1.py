@@ -113,13 +113,15 @@ class TestAPI01ValidateSetupNotConfigured(TestSetup):
     """API-01: validate_setup() 未配置状态"""
     
     def test_validate_setup_not_configured(self):
-        """测试未配置时返回 configured=False"""
+        """测试未配置时返回 configured=False 和错误信息"""
         status = api.validate_setup()
         
         self.assertFalse(status.configured)
         self.assertIsNone(status.manager_dir)
-        self.assertIsNone(status.error)
-        print(f"[PASS] API-01 PASS: configured={status.configured}")
+        # 未配置时应该返回错误信息，帮助用户了解原因
+        self.assertIsNotNone(status.error)
+        self.assertIn("不存在", status.error)
+        print(f"[PASS] API-01 PASS: configured={status.configured}, error={status.error}")
 
 
 class TestAPI02ValidateSetupConfigured(TestSetup):

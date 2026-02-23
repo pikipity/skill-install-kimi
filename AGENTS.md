@@ -1190,6 +1190,55 @@ CLI 模式：  用户命令 → cli.py → cli_ui.py → api.py → core.py
 
 ---
 
+### ~~TODO-11：首次配置流程完善~~ ✅ 已修复
+
+**问题描述**：
+从 CLI 改为纯 Kimi 交互工具时，存在两个问题：
+1. **代码层面**：`is_configured` 只检查配置文件是否存在，不验证内容有效性，导致空文件/无效JSON/缺少字段时返回 `True`
+2. **文档层面**：SKILL.md 中首次配置引导过于简略，缺少完整流程说明和错误处理示例
+
+**修复内容**：
+
+**1. 代码修复**
+
+- **`config.py` - `is_configured` 属性增强**（第 87-108 行）：
+  - 不仅检查文件是否存在，还验证内容有效性
+  - 自动处理空文件、无效 JSON、缺少字段等情况
+  - 无效配置自动返回 `False`，引导用户重新配置
+
+- **`api.py` - `validate_setup()` 增强**（第 93-147 行）：
+  - 提供详细的错误信息（"配置文件不存在"、"配置无效: xxx" 等）
+  - 区分"文件不存在"和"内容无效"两种场景
+  - 帮助 Kimi 准确引导用户完成初始配置
+
+**2. 文档完善**
+
+- **`SKILL.md` - 完善"第二步：初始配置"**：
+  - 添加完整的 4 步配置流程（展示界面 → 处理选择 → 验证保存 → 确认成功）
+  - 提供用户选择 A/B 后的具体代码示例（获取当前目录、验证路径等）
+  - 添加配置错误处理示例（展示 `status.error` 并引导重新配置）
+  - 包含路径验证逻辑（存在性、绝对路径、写入权限）
+
+**测试验证**：
+
+| 场景 | 修复前 | 修复后 |
+|------|--------|--------|
+| 配置文件不存在 | `configured=False` ✅ | `configured=False` + 错误信息 ✅ |
+| 空文件 | `configured=True` ❌ | `configured=False` ✅ |
+| 无效 JSON | `configured=True` ❌ | `configured=False` + 错误信息 ✅ |
+| 缺少字段 | `configured=True` ❌ | `configured=False` ✅ |
+| 有效配置 | `configured=True` ✅ | `configured=True` ✅ |
+
+**代码变更**：
+- `skill-installer/src/config.py`: `is_configured` 属性增强验证逻辑
+- `skill-installer/src/api.py`: `validate_setup()` 提供更详细的错误信息
+- `skill-installer/SKILL.md`: 完善首次配置引导流程
+- `tests/test_api_l1.py`: 更新测试期望以匹配新的行为
+
+**修复状态**：✅ 已修复（2026-02-23）
+
+---
+
 ## 十、修订记录
 
 | 日期 | 版本 | 修订内容 |
@@ -1197,3 +1246,4 @@ CLI 模式：  用户命令 → cli.py → cli_ui.py → api.py → core.py
 | 2026-02-22 | v1.0 | 初始版本，确立目录结构、交互规范和跨平台兼容性方案 |
 | 2026-02-22 | v1.1 | 完成隔离测试方案（TODO-3）：<br>• L1: 110 个单元测试通过<br>• L2: 7 个隔离功能测试通过<br>• 修复 4 个代码问题（symlink_to 参数、is_admin 调用、导入缺失、路径计算） |
 | 2026-02-23 | v2.0 | 架构调整为纯 Kimi 交互式（TODO-10）：<br>• SKILL.md 重写为 Kimi 交互工作流<br>• README.md 重写为用户导向说明<br>• AGENTS.md 新增"架构演进"章节<br>• CLI 代码保留但不使用<br>• 跨平台支持通过 SKILL.md 指导 Kimi 实现 |
+| 2026-02-23 | v2.1 | 首次配置流程完善（TODO-11）：<br>• 修复 `is_configured` 不验证内容有效性的问题<br>• `validate_setup()` 返回详细错误信息<br>• 空文件/无效JSON/缺少字段均触发重新配置 |

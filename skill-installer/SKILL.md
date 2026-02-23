@@ -42,7 +42,11 @@ status = api.validate_setup()
 
 ### 第二步：初始配置（如需要）
 
-如果 `status.configured` 为 `False`，引导用户完成初始配置：
+如果 `status.configured` 为 `False`，引导用户完成初始配置。
+
+**完整配置流程**：
+
+1. **展示初始配置界面**：
 
 ```
 ⚙️ 初始配置
@@ -50,18 +54,85 @@ status = api.validate_setup()
 
 【说明】
 skill-installer 需要一个管理目录来存放所有 skill 仓库。
+首次使用需要配置管理目录。
+
+【当前工作目录】
+  /Users/{username}/Documents/kimi/skills/
 
 【选项】
-  [A] 使用当前目录：/Users/{username}/Documents/kimi/skills/
+  [A] 使用当前目录作为管理目录
   [B] 自定义其他目录
+  [C] 取消操作
 
 请选择 > 
 ```
 
-用户选择并确认路径后，保存配置：
+2. **处理用户选择**：
+
+**如果用户选择 A**（使用当前目录）：
+```python
+import os
+manager_dir = os.getcwd()  # 获取当前工作目录
+```
+
+**如果用户选择 B**（自定义目录）：
+```
+请输入管理目录的完整路径 > /Users/{username}/my-skills
+
+【路径确认】
+  /Users/{username}/my-skills
+
+是否确认使用此目录？ [Y/n] > Y
+```
+
+3. **验证并保存配置**：
 
 ```python
-success, error = api.initialize_config(manager_dir)
+import os
+from pathlib import Path
+
+# 验证路径
+path = Path(manager_dir).expanduser().resolve()
+if not path.exists():
+    print(f"错误：目录不存在: {path}")
+    return
+if not path.is_absolute():
+    print(f"错误：必须是绝对路径: {path}")
+    return
+if not os.access(path, os.W_OK):
+    print(f"错误：没有写入权限: {path}")
+    return
+
+# 保存配置
+success, error = api.initialize_config(str(path))
+if success:
+    print("✅ 配置已保存")
+else:
+    print(f"❌ 配置失败: {error}")
+```
+
+4. **验证配置成功**：
+
+```python
+# 再次检查配置状态
+status = api.validate_setup()
+if status.configured:
+    print(f"✅ 配置成功！")
+    print(f"   管理目录: {status.manager_dir}")
+    print(f"   平台: {status.platform}")
+```
+
+**配置错误处理**：
+
+如果 `status.error` 不为空，说明配置有问题，展示错误并引导重新配置：
+
+```python
+status = api.validate_setup()
+if not status.configured:
+    if status.error:
+        print(f"⚠️ 配置问题: {status.error}")
+        print("需要重新配置。")
+    # 继续引导配置流程...
 ```
 
 ### 第三步：跨平台处理（重要）

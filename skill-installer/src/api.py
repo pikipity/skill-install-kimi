@@ -96,6 +96,10 @@ def validate_setup() -> SetupStatus:
     
     Returns:
         SetupStatus: 配置状态信息，包含平台类型和管理员权限（Windows）
+    
+    Note:
+        如果配置文件不存在、为空、格式错误或缺少必要字段，
+        将返回 configured=False 并附带错误信息
     """
     # 获取平台信息
     platform = PlatformInfo.get_system()
@@ -103,13 +107,44 @@ def validate_setup() -> SetupStatus:
     
     config = ConfigManager()
     
-    if not config.is_configured:
+    # 检查配置文件是否存在
+    if not config.config_file.exists():
         return SetupStatus(
             configured=False,
             platform=platform,
-            is_admin=is_admin
+            is_admin=is_admin,
+            error="配置文件不存在，需要初始化"
         )
     
+    # 检查是否已配置（包括验证内容有效性）
+    if not config.is_configured:
+        # 尝试加载获取具体错误信息
+        try:
+            config.load()
+            valid, error = config.validate()
+            if not valid:
+                return SetupStatus(
+                    configured=False,
+                    platform=platform,
+                    is_admin=is_admin,
+                    error=f"配置无效: {error}"
+                )
+        except ConfigError as e:
+            return SetupStatus(
+                configured=False,
+                platform=platform,
+                is_admin=is_admin,
+                error=f"配置加载失败: {e}"
+            )
+        # 如果到这里，说明配置有效但 is_configured 返回 False（不应该发生）
+        return SetupStatus(
+            configured=False,
+            platform=platform,
+            is_admin=is_admin,
+            error="配置状态异常"
+        )
+    
+    # 配置有效，获取管理目录
     try:
         manager_dir = config.get_manager_dir()
         return SetupStatus(
