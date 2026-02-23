@@ -3,6 +3,17 @@ Kimi 交互式 API
 
 提供纯函数接口，无 input/print，返回结构化数据。
 Kimi 可以直接调用这些函数来控制交互流程。
+
+这是 skill-installer 的主要入口，支持跨平台（macOS/Linux/Windows）。
+Windows 权限处理通过返回的数据指导 Kimi 展示相应选项。
+
+典型调用流程：
+    1. status = validate_setup()          # 检查配置和平台
+    2. plan = generate_install_plan(...)  # 生成方案（含跨平台信息）
+    3. # Kimi 展示方案，用户确认
+    4. result = install_skill(...)        # 执行操作
+
+详见 SKILL.md 中的 Workflow 章节。
 """
 
 from dataclasses import dataclass, field

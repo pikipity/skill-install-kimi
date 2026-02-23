@@ -1,96 +1,140 @@
-# Skill Installer
+# Skill Installer（Kimi 交互式）
 
-标准化安装、卸载、管理 Kimi CLI Skills 的工具。
+标准化安装、卸载、管理 Kimi CLI Skills 的**Kimi 交互式**工具。
 
-## 功能特性
+通过自然语言与 Kimi 对话，完成 skill 的安装、卸载和管理。
 
-- **标准化安装**：通过软连接将 skill 注册到 Kimi CLI
-- **非侵入式卸载**：卸载时仅删除软连接，保留原始仓库
-- **跨平台支持**：支持 macOS、Linux 和 Windows
-- **配置管理**：管理目录配置保存在 skill 内部，随项目迁移
+---
 
 ## 快速开始
 
-### 安装本 Skill
+直接告诉 Kimi 你的需求：
 
-```bash
-# macOS / Linux
-ln -s /path/to/skill-install-project/skill-installer ~/.kimi/skills/skill-installer
-
-# Windows（管理员 PowerShell）
-New-Item -ItemType SymbolicLink `
-  -Path "$env:USERPROFILE\.kimi\skills\skill-installer" `
-  -Target "C:\path\to\skill-install-project\skill-installer"
+```
+帮我安装 skill-pdf
 ```
 
-### 首次使用
-
-运行任意命令触发初始配置：
-
-```bash
-@skill-installer list
+```
+列出我安装的所有 skills
 ```
 
-按提示选择管理目录后即可使用。
+```
+卸载 skill-xxx
+```
 
-## 命令参考
+```
+更改 skill 管理目录
+```
+
+Kimi 会：
+1. 展示安装/卸载方案
+2. 询问你的确认 `[Y/n]`
+3. 执行操作并反馈结果
+
+---
+
+## 跨平台支持
+
+| 平台 | 支持状态 | 说明 |
+|------|----------|------|
+| macOS | ✅ 完全支持 | 原生软连接，普通用户权限 |
+| Linux | ✅ 完全支持 | 原生软连接，普通用户权限 |
+| Windows | ⚠️ 需要管理员权限 | 提供降级方案（手动命令）|
+
+### Windows 用户特别提示
+
+由于 Windows 创建软连接需要管理员权限，Kimi 会：
+
+1. **自动检测权限**：判断是否有管理员权限
+2. **提供选项**：
+   - [A] 退出，以管理员身份重新运行 Kimi CLI
+   - [B] 获取手动创建软连接的 PowerShell/CMD 命令
+   - [C] 取消操作
+3. **引导完成**：如选择手动创建，提供详细命令并继续后续配置
+
+---
+
+## 交互示例
 
 ### 安装 Skill
 
-```bash
-@skill-installer install <skill-name>
+```
+用户：安装 skill-pdf
+
+Kimi：📦 安装方案：skill-pdf
+      ═══════════════════════════════════════════════════════
+      
+      【安装位置】
+        原始仓库：/Users/{username}/Documents/kimi/skills/skill-pdf/
+        软连接：  ~/.kimi/skills/skill-pdf
+      
+      【选项】
+        [A] 完全安装  [B] 轻量安装  [C] 仅克隆  [D] 取消
+      
+      > A
+      
+      是否确认执行安装？ [Y/n]：Y
+      
+      ✅ 安装成功！
 ```
 
-**选项**：
-- `--option full` - 完全安装（默认）
-- `--option light` - 轻量安装
-- `--option clone-only` - 仅克隆
+### Windows 权限处理
+
+```
+用户：安装 skill-pdf
+
+Kimi：⚠️ 检测到 Windows，创建软连接需要管理员权限
+      
+      【选项】
+        [A] 退出以管理员重开  
+        [B] 获取手动创建软连接的命令  
+        [C] 取消
+      
+      > B
+      
+      ═══════════════════════════════════════════════════════
+      手动创建软连接指令
+      ═══════════════════════════════════════════════════════
+      
+      请以管理员身份打开 PowerShell，执行：
+      
+      New-Item -ItemType SymbolicLink `
+        -Path "$env:USERPROFILE\.kimi\skills\skill-pdf" `
+        -Target "C:\Users\{username}\Documents\kimi\skills\skill-pdf"
+      
+      完成后告诉我"已手动创建"，我继续完成配置记录。
+```
 
 ### 卸载 Skill
 
-```bash
-@skill-installer uninstall <skill-name>
+```
+用户：卸载 skill-pdf
+
+Kimi：🗑️ 卸载方案：skill-pdf
+      ═══════════════════════════════════════════════════════
+      
+      【将执行的操作】
+        ✅ 删除软连接：~/.kimi/skills/skill-pdf
+      
+      【将保留的内容】（如需删除，请手动执行）
+        📁 原始仓库：/Users/{username}/Documents/kimi/skills/skill-pdf/
+           删除命令：rm -rf '/Users/{username}/Documents/kimi/skills/skill-pdf/'
+      
+      是否确认删除软连接？ [Y/n]：Y
+      
+      ✅ 已删除软连接
 ```
 
-仅删除软连接，保留原始仓库。
-
-### 列出 Skills
-
-```bash
-# 列出所有
-@skill-installer list
-
-# 仅列出已安装
-@skill-installer list --installed
-
-# 仅列出可安装
-@skill-installer list --available
-```
-
-### 查看详情
-
-```bash
-@skill-installer info <skill-name>
-```
-
-### 配置管理
-
-```bash
-# 显示配置
-@skill-installer config --show
-
-# 重置配置
-@skill-installer config --reset
-```
+---
 
 ## 目录结构
 
 ```
 skill-install-project/              # 管理目录
 ├── skill-installer/                # 本 skill
-│   ├── SKILL.md                    # Skill 定义
+│   ├── SKILL.md                    # Skill 定义（Kimi 读取）
 │   ├── src/                        # 源代码
-│   │   ├── cli.py                  # 命令行接口
+│   │   ├── api.py                  # ★ Kimi API 层（核心）
 │   │   ├── core.py                 # 核心逻辑
 │   │   ├── config.py               # 配置管理
 │   │   ├── path_manager.py         # 路径管理
@@ -101,28 +145,53 @@ skill-install-project/              # 管理目录
 └── ...                             # 其他 skills
 ```
 
+---
+
 ## 设计原则
 
 遵循六大原则：
 
-1. **方案先行**：安装前展示完整方案，用户确认后执行
+1. **方案先行**：安装/卸载前展示完整方案，用户确认后执行
 2. **依赖解释**：清晰列出依赖及其作用、大小
 3. **路径规范**：使用相对路径软连接
 4. **非侵入式**：卸载仅删除软连接，保留原始仓库
 5. **双位置分离**：区分原始仓库和软连接位置
 6. **可回滚**：安装失败自动回滚
 
-## 平台说明
+---
 
-### Windows
+## 技术说明
 
-- 创建软连接需要**管理员权限**
-- 无权限时工具会提供手动创建指令
+### CLI 模式（保留备用）
 
-### macOS / Linux
+项目保留了 CLI 模式代码（`src/cli.py`, `src/cli_ui.py`），但不作为默认使用方式。
 
-- 普通用户权限即可创建软连接
-- 建议使用相对路径，便于项目迁移
+如需使用 CLI 模式，可直接运行：
+
+```bash
+python -m skill-installer install <skill-name>
+python -m skill-installer uninstall <skill-name>
+python -m skill-installer list
+```
+
+### API 层
+
+Kimi 通过 `skill_installer.api` 模块调用功能：
+
+```python
+from skill_installer import api
+
+# 检查配置
+status = api.validate_setup()
+
+# 生成安装方案
+plan = api.generate_install_plan("skill-pdf", option="full")
+
+# 执行安装
+result = api.install_skill("skill-pdf", option="full")
+```
+
+---
 
 ## 开发
 
@@ -132,8 +201,9 @@ skill-install-project/              # 管理目录
 skill-installer/
 ├── src/
 │   ├── __init__.py
-│   ├── __main__.py         # 入口点
-│   ├── cli.py              # CLI 接口
+│   ├── api.py              # ★ Kimi API 层（主入口）
+│   ├── cli.py              # CLI 入口（保留不使用）
+│   ├── cli_ui.py           # CLI 交互层（保留不使用）
 │   ├── core.py             # 核心逻辑
 │   ├── config.py           # 配置管理
 │   ├── dependency.py       # 依赖分析
@@ -141,22 +211,18 @@ skill-installer/
 │   ├── platform_utils.py   # 跨平台工具
 │   └── validator.py        # 验证器
 ├── data/                   # 运行时数据（.gitignore）
-├── SKILL.md                # Skill 定义
+├── SKILL.md                # Skill 定义（Kimi 读取）
 └── README.md               # 本文件
 ```
 
 ### 本地测试
 
 ```bash
-# 运行
-python -m skill-installer list
-
-# 安装 skill
-python -m skill-installer install some-skill
-
-# 卸载 skill
-python -m skill-installer uninstall some-skill
+# 运行测试
+python -m unittest discover -s tests -v
 ```
+
+---
 
 ## 许可证
 

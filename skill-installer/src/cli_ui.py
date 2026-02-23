@@ -1,9 +1,18 @@
 """
 CLI 专用 UI 交互层
 
+⚠️ 此文件保留但不使用
+
+当前 skill-installer 使用 Kimi 交互式工作流，所有交互由 Kimi 通过自然语言处理。
+CLI 交互层代码完整保留作为参考实现。
+
 集中管理所有 input()/print() 调用，仅用于命令行模式。
 Kimi 交互模式不使用此模块。
 """
+# ============================================================================
+# NOTE: This module is kept for reference but not used in the Kimi interactive
+# workflow. All UI interactions are now handled by Kimi based on api.py output.
+# ============================================================================
 
 import sys
 from typing import Optional, List, Any

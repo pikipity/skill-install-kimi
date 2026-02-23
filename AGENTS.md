@@ -943,7 +943,7 @@ class TestSkillInstaller(unittest.TestCase):
 
 ---
 
-### TODO-9：Windows 平台完整测试验证 ⏳ 待执行
+### ~~TODO-9：Windows 平台完整测试验证~~ ✅ 已完成
 
 **目标**：在 Windows 平台验证 skill-installer 的完整功能，确保跨平台兼容性。
 
@@ -1022,7 +1022,65 @@ class TestSkillInstaller(unittest.TestCase):
 
 ---
 
-## 八、开发检查清单
+## 八、架构演进
+
+### v1.0 → v2.0：从 CLI 到 Kimi 交互式
+
+#### 初始架构（v1.0）：纯 CLI 工具
+
+```
+用户输入命令 → cli.py → core.py → 执行操作
+```
+
+**问题**：Kimi 无法介入交互流程，沦为命令转发器。
+
+#### 中间架构（v1.5）：Kimi 交互 + CLI 双模式
+
+```
+Kimi 模式：用户对话 → Kimi → api.py → core.py → 返回数据 → Kimi 展示
+CLI 模式：  用户命令 → cli.py → cli_ui.py → api.py → core.py
+```
+
+**改进**：分离 API 层和 CLI 层，支持两种模式。
+
+#### 当前架构（v2.0）：纯 Kimi 交互式
+
+```
+用户对话 → Kimi 读取 SKILL.md → api.validate_setup()
+                                        ↓
+            Kimi 控制交互流程 → api.generate_install_plan() → 展示方案
+                                        ↓
+                                用户确认 [Y/n] → api.install_skill() → 返回结果
+```
+
+**特点**：
+- CLI 代码（`cli.py`, `cli_ui.py`）完整保留但不使用
+- 所有交互由 Kimi 通过自然语言处理
+- 跨平台逻辑通过 SKILL.md 指导 Kimi 使用 API 数据
+
+### 代码组织（v2.0）
+
+| 文件 | 状态 | 职责 |
+|------|------|------|
+| `api.py` | ✅ **主入口** | Kimi 直接调用的纯函数接口 |
+| `core.py` | ✅ 核心逻辑 | 业务逻辑，无 UI 依赖 |
+| `config.py` | ✅ 配置管理 | 读写 data/config.json |
+| `cli.py` | ⏸️ 保留不使用 | CLI 入口，参考实现 |
+| `cli_ui.py` | ⏸️ 保留不使用 | CLI 交互层，参考实现 |
+
+### 跨平台支持（v2.0）
+
+通过 SKILL.md 指导 Kimi 处理平台差异：
+
+1. **Windows 权限检测**：`validate_setup()` 返回 `platform` 和 `is_admin`
+2. **手动命令生成**：`generate_install_plan()` 返回 `windows_manual_command`
+3. **删除命令生成**：`generate_uninstall_plan()` 返回 `delete_commands` 字典
+
+无需修改代码，仅通过文档指导 Kimi 使用现有 API 数据。
+
+---
+
+## 九、开发检查清单
 
 在修改代码前，确认以下事项：
 
@@ -1037,9 +1095,42 @@ class TestSkillInstaller(unittest.TestCase):
 
 ---
 
+### ~~TODO-10：架构调整为纯 Kimi 交互式（CLI 保留不使用）~~ ✅ 已完成
+
+**完成日期**：2026-02-23
+
+**目标**：将 skill-installer 从「Kimi 交互 + CLI 双模式」改为「纯 Kimi 交互式」，CLI 代码保留但不使用。
+
+**改动原则**：
+- README.md + AGENTS.md：大改，重写为 Kimi 交互式说明
+- SKILL.md：重写，指导 Kimi 处理跨平台场景
+- 代码文件（cli.py, cli_ui.py, api.py）：仅添加注释标记，不改实现
+
+**任务清单**：
+
+| 序号 | 文件 | 改动类型 | 状态 |
+|------|------|----------|------|
+| 1 | `SKILL.md` | 📝 重写为 Kimi 交互工作流 | ✅ 已完成 |
+| 2 | `README.md` | 📝 重写为用户导向的 Kimi 交互说明 | ✅ 已完成 |
+| 3 | `AGENTS.md` | 📝 新增架构演进章节 | ✅ 已完成 |
+| 4 | `src/cli.py` | ➕ 添加保留注释 | ✅ 已完成 |
+| 5 | `src/cli_ui.py` | ➕ 添加保留注释 | ✅ 已完成 |
+| 6 | `src/api.py` | ➕ 添加模块注释（可选） | ✅ 已完成 |
+
+**跨平台支持**：通过 SKILL.md 指导 Kimi 使用 API 返回的平台信息处理 Windows 权限场景，无需修改代码。
+
+**验证状态**：
+- ✅ SKILL.md 重写完成，包含完整的跨平台处理指导
+- ✅ README.md 重写完成，面向用户的 Kimi 交互说明
+- ✅ AGENTS.md 新增"架构演进"章节，记录 v1.0 → v2.0 演变
+- ✅ 代码文件仅添加注释，零逻辑改动
+
+---
+
 ## 九、修订记录
 
 | 日期 | 版本 | 修订内容 |
 |------|------|----------|
 | 2026-02-22 | v1.0 | 初始版本，确立目录结构、交互规范和跨平台兼容性方案 |
 | 2026-02-22 | v1.1 | 完成隔离测试方案（TODO-3）：<br>• L1: 110 个单元测试通过<br>• L2: 7 个隔离功能测试通过<br>• 修复 4 个代码问题（symlink_to 参数、is_admin 调用、导入缺失、路径计算） |
+| 2026-02-23 | v2.0 | 架构调整为纯 Kimi 交互式（TODO-10）：<br>• SKILL.md 重写为 Kimi 交互工作流<br>• README.md 重写为用户导向说明<br>• AGENTS.md 新增"架构演进"章节<br>• CLI 代码保留但不使用<br>• 跨平台支持通过 SKILL.md 指导 Kimi 实现 |

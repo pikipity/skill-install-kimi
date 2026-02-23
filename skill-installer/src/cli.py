@@ -1,8 +1,18 @@
 """
 命令行接口 - 基于 API 层的终端交互封装
 
+⚠️ 此文件保留但不使用
+
+当前 skill-installer 使用 Kimi 交互式工作流，用户通过自然语言与 Kimi 对话完成操作。
+CLI 模式代码完整保留作为参考实现，如需使用可直接运行：
+    python -m skill_installer.src.cli install <skill-name>
+
 CLI 模式入口，通过 cli_ui 处理交互，调用 api 执行操作。
 """
+# ============================================================================
+# NOTE: This module is kept for reference but not used in the Kimi interactive
+# workflow. See SKILL.md for the current usage pattern.
+# ============================================================================
 
 import sys
 import argparse
