@@ -109,7 +109,8 @@ class TestConfigManager(unittest.TestCase):
         config = {'manager_dir': '/not/exist/path'}
         valid, error = self.config_manager.validate(config)
         self.assertFalse(valid)
-        self.assertIn('不存在', error)
+        # 错误消息可能是 "管理目录不存在" 或 "必须是绝对路径"（Windows 对 /path 的处理）
+        self.assertTrue('不存在' in error or '绝对路径' in error, f"错误消息: {error}")
     
     def test_validate_valid(self):
         """测试有效配置验证"""

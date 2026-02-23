@@ -14,6 +14,14 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).parent))
 import test_import_helper
 from skill_installer.src.validator import Validator, ValidationStatus, ValidationResult
+from skill_installer.src.platform_utils import PlatformInfo, PlatformUtils
+
+# 辅助函数：Windows 下无管理员权限时跳过
+def skip_if_windows_no_admin():
+    """如果 Windows 无管理员权限则跳过测试"""
+    if PlatformInfo.is_windows() and not PlatformUtils.is_admin():
+        return True
+    return False
 
 
 class TestValidationResult(unittest.TestCase):
@@ -136,6 +144,8 @@ class TestValidateNotAlreadyInstalled(unittest.TestCase):
     
     def test_already_installed(self):
         """测试已安装"""
+        if skip_if_windows_no_admin():
+            self.skipTest('Windows 需要管理员权限创建软连接')
         symlink = self.tmp_dir / 'symlink'
         source = self.tmp_dir / 'source'
         source.mkdir()
@@ -166,6 +176,8 @@ class TestValidateSymlinkReadable(unittest.TestCase):
     
     def test_valid_symlink(self):
         """测试有效软连接"""
+        if skip_if_windows_no_admin():
+            self.skipTest('Windows 需要管理员权限创建软连接')
         source = self.tmp_dir / 'source'
         source.mkdir()
         symlink = self.tmp_dir / 'symlink'
@@ -178,6 +190,8 @@ class TestValidateSymlinkReadable(unittest.TestCase):
     
     def test_broken_symlink(self):
         """测试损坏的软连接"""
+        if skip_if_windows_no_admin():
+            self.skipTest('Windows 需要管理员权限创建软连接')
         source = self.tmp_dir / 'source'
         source.mkdir()
         symlink = self.tmp_dir / 'symlink'
@@ -211,6 +225,8 @@ class TestValidateUninstallTarget(unittest.TestCase):
     
     def test_valid_symlink(self):
         """测试有效软连接"""
+        if skip_if_windows_no_admin():
+            self.skipTest('Windows 需要管理员权限创建软连接')
         source = self.tmp_dir / 'source'
         source.mkdir()
         symlink = self.tmp_dir / 'symlink'
@@ -321,6 +337,8 @@ class TestRunPostInstallChecks(unittest.TestCase):
     @patch('skill_installer.src.validator.PlatformInfo')
     def test_all_pass(self, mock_platform):
         """测试全部通过"""
+        if skip_if_windows_no_admin():
+            self.skipTest('Windows 需要管理员权限创建软连接')
         # Mock PlatformInfo.get_skills_dir 返回临时目录
         skills_dir = self.tmp_dir / '.kimi' / 'skills'
         skills_dir.mkdir(parents=True)

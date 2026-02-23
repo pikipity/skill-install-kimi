@@ -100,9 +100,11 @@ class TestSetup(unittest.TestCase):
                 try:
                     symlink.symlink_to(skill_src)
                 except OSError:
-                    # Windows 可能需要特殊处理
-                    import subprocess
-                    subprocess.run(["ln", "-s", str(skill_src), str(symlink)], check=False)
+                    # Windows 需要管理员权限，跳过创建
+                    from skill_installer.src.platform_utils import PlatformInfo, PlatformUtils
+                    if PlatformInfo.is_windows() and not PlatformUtils.is_admin():
+                        return skill_src  # 无法创建软连接，返回源码路径
+                    raise
         
         return skill_src
 
@@ -117,7 +119,7 @@ class TestAPI01ValidateSetupNotConfigured(TestSetup):
         self.assertFalse(status.configured)
         self.assertIsNone(status.manager_dir)
         self.assertIsNone(status.error)
-        print(f"✅ API-01 PASS: configured={status.configured}")
+        print(f"[PASS] API-01 PASS: configured={status.configured}")
 
 
 class TestAPI02ValidateSetupConfigured(TestSetup):
@@ -135,7 +137,7 @@ class TestAPI02ValidateSetupConfigured(TestSetup):
         self.assertTrue(status.configured)
         self.assertEqual(str(Path(status.manager_dir).resolve()), str(self.temp_manager_dir.resolve()))
         self.assertIsNone(status.error)
-        print(f"✅ API-02 PASS: configured={status.configured}, dir={status.manager_dir}")
+        print(f"[PASS] API-02 PASS: configured={status.configured}, dir={status.manager_dir}")
 
 
 class TestAPI03InitializeConfigSuccess(TestSetup):
@@ -151,7 +153,7 @@ class TestAPI03InitializeConfigSuccess(TestSetup):
         # 验证配置文件已创建
         status = api.validate_setup()
         self.assertTrue(status.configured)
-        print(f"✅ API-03 PASS: 配置初始化成功")
+        print(f"[PASS] API-03 PASS: 配置初始化成功")
 
 
 class TestAPI04InitializeConfigFailure(TestSetup):
@@ -163,7 +165,7 @@ class TestAPI04InitializeConfigFailure(TestSetup):
         
         self.assertFalse(success)
         self.assertIn("不存在", error)
-        print(f"✅ API-04 PASS: 错误信息={error}")
+        print(f"[PASS] API-04 PASS: 错误信息={error}")
 
 
 class TestAPI05ListAvailableSkills(TestSetup):
@@ -185,7 +187,7 @@ class TestAPI05ListAvailableSkills(TestSetup):
         skill_names = [s.name for s in skills]
         self.assertIn("test-skill-1", skill_names)
         self.assertIn("test-skill-2", skill_names)
-        print(f"✅ API-05 PASS: 找到 {len(skills)} 个可安装 skills")
+        print(f"[PASS] API-05 PASS: 找到 {len(skills)} 个可安装 skills")
 
 
 class TestAPI06ListInstalledSkills(TestSetup):
@@ -205,7 +207,7 @@ class TestAPI06ListInstalledSkills(TestSetup):
         self.assertEqual(len(skills), 1)
         self.assertEqual(skills[0].name, "installed-skill")
         self.assertTrue(skills[0].is_installed)
-        print(f"✅ API-06 PASS: 找到 {len(skills)} 个已安装 skills")
+        print(f"[PASS] API-06 PASS: 找到 {len(skills)} 个已安装 skills")
 
 
 class TestAPI07GenerateInstallPlan(TestSetup):
@@ -227,7 +229,7 @@ class TestAPI07GenerateInstallPlan(TestSetup):
         self.assertEqual(plan.option, "full")
         self.assertTrue(plan.pre_check_passed)
         self.assertIn("plan-skill", plan.source_path)
-        print(f"✅ API-07 PASS: 方案生成成功，选项={plan.option}")
+        print(f"[PASS] API-07 PASS: 方案生成成功，选项={plan.option}")
 
 
 class TestAPI08GenerateUninstallPlan(TestSetup):
@@ -248,7 +250,7 @@ class TestAPI08GenerateUninstallPlan(TestSetup):
         self.assertEqual(plan.skill_name, "uninstall-skill")
         self.assertTrue(plan.pre_check_passed)
         self.assertIn("delete_commands", dir(plan))
-        print(f"✅ API-08 PASS: 卸载方案生成成功")
+        print(f"[PASS] API-08 PASS: 卸载方案生成成功")
 
 
 class TestAPI09InstallSkillSuccess(TestSetup):
@@ -271,7 +273,7 @@ class TestAPI09InstallSkillSuccess(TestSetup):
         # 验证软连接已创建
         symlink = self.temp_kimi_dir / "skills" / "install-me"
         self.assertTrue(symlink.exists() or symlink.is_symlink())
-        print(f"✅ API-09 PASS: 安装成功，软连接={result.symlink_path}")
+        print(f"[PASS] API-09 PASS: 安装成功，软连接={result.symlink_path}")
 
 
 class TestAPI10InstallSkillFailure(TestSetup):
@@ -287,7 +289,7 @@ class TestAPI10InstallSkillFailure(TestSetup):
         
         self.assertFalse(result.success)
         self.assertIn("失败", result.message)
-        print(f"✅ API-10 PASS: 安装失败处理正确，错误={result.message}")
+        print(f"[PASS] API-10 PASS: 安装失败处理正确，错误={result.message}")
 
 
 class TestAPI11UninstallSkillSuccess(TestSetup):
@@ -309,7 +311,7 @@ class TestAPI11UninstallSkillSuccess(TestSetup):
         # 验证软连接已删除
         symlink = self.temp_kimi_dir / "skills" / "uninstall-me"
         self.assertFalse(symlink.exists())
-        print(f"✅ API-11 PASS: 卸载成功")
+        print(f"[PASS] API-11 PASS: 卸载成功")
 
 
 class TestAPI12GetSkillDetail(TestSetup):
@@ -334,7 +336,7 @@ class TestAPI12GetSkillDetail(TestSetup):
         self.assertEqual(detail['name'], "detail-skill")
         self.assertIn("skill_md_preview", detail)
         self.assertIn("Detail Skill", detail['skill_md_preview'])
-        print(f"✅ API-12 PASS: 详情获取成功，包含 SKILL.md 预览")
+        print(f"[PASS] API-12 PASS: 详情获取成功，包含 SKILL.md 预览")
 
 
 def run_tests():
