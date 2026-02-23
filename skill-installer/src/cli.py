@@ -20,7 +20,7 @@ from .cli_ui import (
 
 # 核心类型
 from .config import ConfigManager, ConfigError
-from .platform_utils import PlatformInfo
+from .platform_utils import PlatformInfo, PlatformUtils
 
 
 class CLI:
@@ -175,7 +175,7 @@ class CLI:
         skill_name = args.skill_name
         
         # Windows 权限检查
-        if PlatformInfo.is_windows() and not PlatformInfo.is_admin():
+        if PlatformInfo.is_windows() and not PlatformUtils.is_admin():
             self.ui.print_warning("Windows 创建软连接需要管理员权限")
             self.ui.print_info("\n【选项】")
             self.ui.print("  [A] 继续尝试（可能失败）")

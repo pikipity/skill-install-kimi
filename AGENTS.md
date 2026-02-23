@@ -835,6 +835,114 @@ src/
 
 ---
 
+### ~~TODO-6：`cli.py` Windows 权限检测调用错误~~ ✅ 已修复
+
+**发现日期**：2026-02-23
+
+**问题描述**：
+`cli.py` 第 178 行错误地调用了 `PlatformInfo.is_admin()`，但 `is_admin()` 方法定义在 `PlatformUtils` 类中。在 macOS/Linux 上由于条件短路不会触发此 Bug，但在 Windows 上会抛出 `AttributeError`。
+
+**问题代码**（`cli.py:17, 178`）：
+```python
+from .platform_utils import PlatformInfo  # ❌ 缺少 PlatformUtils 导入
+
+# ...
+
+if PlatformInfo.is_windows() and not PlatformInfo.is_admin():  # ❌ 错误调用
+```
+
+**修复方案**（已应用）：
+```python
+from .platform_utils import PlatformInfo, PlatformUtils  # ✅ 添加 PlatformUtils 导入
+
+# ...
+
+if PlatformInfo.is_windows() and not PlatformUtils.is_admin():  # ✅ 正确调用
+```
+
+**跨平台兼容性**：✅ 完全兼容（`PlatformUtils.is_admin()` 已内置 Windows/macOS/Linux 支持）
+
+**修复状态**：✅ 已修复（2026-02-23）
+
+---
+
+### ~~TODO-7：`tests/test_config.py` 交互测试过时~~ ✅ 已修复
+
+**发现日期**：2026-02-23
+
+**问题描述**：
+架构重构（TODO-4）后，`ConfigManager.interactive_setup()` 和 `interactive_confirm()` 方法已移至 `cli_ui.py` 的 `ConfigSetupUI` 类。但 `test_config.py` 中的测试仍尝试调用这些方法，导致 5 个测试用例失败。
+
+**问题代码**（`tests/test_config.py:187-273`）：
+```python
+class TestInteractiveSetup(unittest.TestCase):
+    def test_interactive_setup_select_current(self):
+        result = self.config_manager.interactive_setup(self.ui)  # ❌ 方法已不存在
+        
+    def test_interactive_confirm_continue(self):
+        result = self.config_manager.interactive_confirm(self.ui)  # ❌ 方法已不存在
+    # ... 其他 3 个测试方法同样问题
+```
+
+**修复方案**（已应用）：
+删除 `TestInteractiveSetup` 类（第 187-273 行），因为：
+1. 交互逻辑现在属于 `cli_ui.py`，不在 `config.py`
+2. 交互测试应在 `test_cli_l2.py` 中测试 `ConfigSetupUI` 类
+3. `ConfigManager` 应保持为纯功能类，无 UI 依赖
+
+**跨平台兼容性**：✅ 完全兼容（仅测试代码组织调整，与平台无关）
+
+**修复状态**：✅ 已修复（2026-02-23）
+
+---
+
+### ~~TODO-8：`tests/test_core.py` 测试代码过时~~ ✅ 已修复
+
+**发现日期**：2026-02-23
+
+**问题描述**：
+架构重构（TODO-4）后，以下测试代码过时：
+1. `InstallPlan` 和 `UninstallPlan` 数据类从 `core.py` 移至 `api.py`，但测试仍从 `core.py` 导入
+2. `SkillInstaller` 类移除了 `set_ui()`、`check_windows_permission()` 等 UI 相关方法，但测试仍尝试调用
+3. `InstallPlan`/`UninstallPlan` 移除了 `format_display()` 方法（UI 逻辑已移至 `cli_ui.py`），但测试仍尝试调用
+
+**问题代码**（`tests/test_core.py` 重构前）：
+```python
+from skill_installer.src.core import (
+    SkillInstaller, InstallOption, InstallPlan, UninstallPlan,  # ❌ 类已移动或移除
+    InstallResult, UninstallResult
+)
+
+class TestInstallPlan(unittest.TestCase):
+    def test_format_display(self):
+        plan = InstallPlan(...)
+        display = plan.format_display()  # ❌ 方法已移除
+
+class TestSkillInstaller(unittest.TestCase):
+    def setUp(self):
+        self.installer.set_ui(self.ui)  # ❌ 方法已移除
+    
+    def test_check_windows_permission(self):
+        self.installer.check_windows_permission()  # ❌ 方法已移除
+```
+
+**修复方案**（已应用）：
+- 删除 `TestInstallPlan` 和 `TestUninstallPlan` 类（它们测试的是已移除的 UI 方法）
+- 删除 `SkillInstaller` 中对 `set_ui()` 和 `check_windows_permission()` 的测试
+- 保留并验证以下有效测试：
+  - `TestInstallResult` - 测试结果数据类
+  - `TestUninstallResult` - 测试卸载结果数据类  
+  - `TestSkillInstaller` - 测试核心安装逻辑（移除 UI 相关测试）
+  - `TestInstallOption` - 测试安装选项枚举
+
+**修复后测试结果**：✅ 10/10 测试通过
+
+**跨平台兼容性**：✅ 完全兼容（仅测试代码更新，不影响业务逻辑）
+
+**修复状态**：✅ 已修复（2026-02-23）
+
+---
+
 ## 八、开发检查清单
 
 在修改代码前，确认以下事项：
