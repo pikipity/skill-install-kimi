@@ -34,9 +34,11 @@ from .platform_utils import PlatformInfo, PlatformUtils
 
 @dataclass
 class SetupStatus:
-    """配置状态"""
+    """配置状态（含跨平台信息）"""
     configured: bool
     manager_dir: Optional[str] = None
+    platform: str = ""           # 'macos' | 'linux' | 'windows'
+    is_admin: bool = False       # Windows 权限关键
     error: Optional[str] = None
 
 
@@ -53,7 +55,7 @@ class SkillInfo:
 
 @dataclass
 class InstallPlan:
-    """安装方案（用于展示给用户）"""
+    """安装方案（含跨平台处理信息）"""
     skill_name: str
     source_path: str
     symlink_path: str
@@ -61,6 +63,10 @@ class InstallPlan:
     option: str  # "full", "light", "clone-only"
     estimated_size: Optional[int] = None
     dependencies: List[Dict[str, Any]] = field(default_factory=list)
+    
+    # 跨平台处理（Windows 权限）
+    requires_admin: bool = False           # 是否需要管理员权限
+    windows_manual_command: Optional[Dict[str, str]] = None  # 手动创建命令
     
     # 预检查状态
     pre_check_passed: bool = True
@@ -86,26 +92,38 @@ class UninstallPlan:
 
 def validate_setup() -> SetupStatus:
     """
-    检查配置状态
+    检查配置状态（含跨平台信息）
     
     Returns:
-        SetupStatus: 配置状态信息
+        SetupStatus: 配置状态信息，包含平台类型和管理员权限（Windows）
     """
+    # 获取平台信息
+    platform = PlatformInfo.get_system()
+    is_admin = PlatformUtils.is_admin()
+    
     config = ConfigManager()
     
     if not config.is_configured:
-        return SetupStatus(configured=False)
+        return SetupStatus(
+            configured=False,
+            platform=platform,
+            is_admin=is_admin
+        )
     
     try:
         manager_dir = config.get_manager_dir()
         return SetupStatus(
             configured=True,
             manager_dir=str(manager_dir),
+            platform=platform,
+            is_admin=is_admin,
             error=None
         )
     except ConfigError as e:
         return SetupStatus(
             configured=False,
+            platform=platform,
+            is_admin=is_admin,
             error=str(e)
         )
 
@@ -319,6 +337,8 @@ def generate_install_plan(skill_name: str, option: str = "full") -> Optional[Ins
     """
     生成安装方案（不执行安装，仅生成方案供展示）
     
+    包含跨平台处理信息（Windows 权限检测和手动命令）。
+    
     Args:
         skill_name: skill 名称
         option: 安装选项 ("full", "light", "clone-only")
@@ -343,12 +363,30 @@ def generate_install_plan(skill_name: str, option: str = "full") -> Optional[Ins
         
         relative_path = paths.calculate_relative_symlink(skill_name)
         
+        # 跨平台处理：Windows 权限检测
+        platform = PlatformInfo.get_system()
+        requires_admin = False
+        windows_manual_command = None
+        
+        if platform == "windows":
+            requires_admin = not PlatformUtils.is_admin()
+            if requires_admin:
+                # 生成手动创建软连接的命令
+                source_str = str(source_path.resolve())
+                target_str = str(symlink_path)
+                windows_manual_command = {
+                    "powershell": f'New-Item -ItemType SymbolicLink -Path "{target_str}" -Target "{source_str}"',
+                    "cmd": f'mklink /D "{target_str}" "{source_str}"'
+                }
+        
         return InstallPlan(
             skill_name=skill_name,
             source_path=str(source_path),
             symlink_path=str(symlink_path),
             relative_path=relative_path,
             option=option,
+            requires_admin=requires_admin,
+            windows_manual_command=windows_manual_command,
             pre_check_passed=pre_check_passed,
             pre_check_errors=pre_check_errors
         )

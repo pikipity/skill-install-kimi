@@ -6,6 +6,72 @@
 
 ---
 
+## ⚠️ 安装注意（必读）
+
+本项目采用**子目录结构**，安装时必须软连接 `skill-installer` 子目录，**不要**软连接项目根目录。
+
+```
+skill-install-kimi/              ← 项目根目录（管理目录）
+├── skill-installer/             ← ★ 创建软连接指向这里
+│   ├── SKILL.md                 # Kimi 读取的入口
+│   ├── src/                     # 源代码
+│   └── data/                    # 配置文件
+├── tests/                       # 测试代码
+├── README.md                    # 用户文档
+└── AGENTS.md                    # 开发文档
+```
+
+### 安装步骤
+
+**Step 1**: 克隆仓库
+```bash
+git clone <repository-url> skill-install-kimi
+cd skill-install-kimi
+```
+
+**Step 2**: 创建软连接（指向 `skill-installer` 子目录）
+
+macOS / Linux:
+```bash
+ln -s $(pwd)/skill-installer ~/.kimi/skills/skill-installer
+```
+
+Windows（管理员 PowerShell）:
+```powershell
+New-Item -ItemType SymbolicLink `
+  -Path "$env:USERPROFILE\.kimi\skills\skill-installer" `
+  -Target "$(pwd)\skill-installer"
+```
+
+**Step 3**: 验证安装
+```bash
+kimi
+# 然后输入：
+@skill-installer list
+# 或对话方式：
+列出我的 skills
+```
+
+### 常见错误
+
+❌ **错误**：软连接整个项目根目录
+```bash
+ln -s /path/to/skill-install-kimi ~/.kimi/skills/skill-installer  # 错误！
+```
+
+✅ **正确**：软连接 `skill-installer` 子目录
+```bash
+ln -s /path/to/skill-install-kimi/skill-installer ~/.kimi/skills/skill-installer
+```
+
+### 为什么没有 skill-installer 也能安装？
+
+如果你还没有 skill-installer，需要**手动创建软连接**（见上方 Step 2）。
+
+安装完成后，就可以通过 Kimi 对话管理其他 skills 了。
+
+---
+
 ## 快速开始
 
 直接告诉 Kimi 你的需求：
