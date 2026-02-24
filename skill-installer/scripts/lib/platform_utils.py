@@ -104,19 +104,27 @@ class PlatformUtils:
     def calculate_relative_path(from_path: Path, to_path: Path) -> str:
         """
         计算相对路径（跨平台统一使用 / 分隔符）
+        Windows 跨驱动器时返回绝对路径
         
         Args:
             from_path: 源路径（软连接指向的目标）
             to_path: 目标路径（软连接所在位置）
         
         Returns:
-            相对路径字符串，使用 / 分隔符
+            相对路径字符串（使用 / 分隔符），跨驱动器时返回绝对路径
         """
         # 确保都是绝对路径
         from_abs = Path(from_path).resolve()
         to_abs = Path(to_path).resolve()
         
-        # 计算相对路径
+        # Windows 跨驱动器场景需要特殊处理
+        if PlatformInfo.is_windows():
+            # 检查是否同驱动器（盘符）
+            if from_abs.drive != to_abs.drive:
+                # 跨驱动器：返回绝对路径（软连接支持绝对路径）
+                return PlatformUtils.to_posix_path(from_abs)
+        
+        # 同驱动器或非 Windows：计算相对路径
         rel = os.path.relpath(from_abs, to_abs.parent)
         # 统一使用 / 分隔符便于显示
         return PlatformUtils.to_posix_path(rel)
