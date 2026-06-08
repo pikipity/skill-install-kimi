@@ -35,3 +35,4 @@ ENV/
 
 # skill-installer data
 skill-installer/data/
+/kimi-skills
