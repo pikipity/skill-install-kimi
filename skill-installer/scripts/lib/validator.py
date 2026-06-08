@@ -7,7 +7,7 @@ from typing import Tuple, Optional, List
 from dataclasses import dataclass
 from enum import Enum
 
-from platform_utils import PlatformInfo
+from platform_utils import PlatformInfo, SymlinkManager
 
 
 class ValidationStatus(Enum):
@@ -129,8 +129,9 @@ class Validator:
         Returns:
             验证结果
         """
-        if symlink_path.exists() or symlink_path.is_symlink():
-            if symlink_path.is_symlink():
+        is_link = SymlinkManager.is_symlink(symlink_path)
+        if symlink_path.exists() or is_link:
+            if is_link:
                 try:
                     target = symlink_path.resolve()
                     return ValidationResult(
@@ -159,7 +160,7 @@ class Validator:
     @staticmethod
     def validate_symlink_readable(symlink_path: Path) -> ValidationResult:
         """
-        验证软连接是否可读（指向的目标存在）
+        验证软连接/junction 是否可读（指向的目标存在）
         
         Args:
             symlink_path: 软连接路径
@@ -167,7 +168,7 @@ class Validator:
         Returns:
             验证结果
         """
-        if not symlink_path.is_symlink():
+        if not SymlinkManager.is_symlink(symlink_path):
             return ValidationResult(
                 status=ValidationStatus.ERROR,
                 message=f"不是软连接: {symlink_path}",
@@ -209,15 +210,16 @@ class Validator:
         """
         skills_dir = PlatformInfo.get_skills_dir()
         skill_link = skills_dir / skill_name
+        is_link = SymlinkManager.is_symlink(skill_link)
         
-        if not skill_link.exists() and not skill_link.is_symlink():
+        if not skill_link.exists() and not is_link:
             return ValidationResult(
                 status=ValidationStatus.ERROR,
                 message=f"Skill 软连接不存在: {skill_link}",
                 suggestion="安装可能未完成"
             )
         
-        if skill_link.is_symlink():
+        if is_link:
             try:
                 target = skill_link.resolve()
                 skill_md = target / "SKILL.md"
@@ -256,14 +258,15 @@ class Validator:
         Returns:
             验证结果
         """
-        if not symlink_path.exists() and not symlink_path.is_symlink():
+        is_link = SymlinkManager.is_symlink(symlink_path)
+        if not symlink_path.exists() and not is_link:
             return ValidationResult(
                 status=ValidationStatus.ERROR,
                 message=f"Skill 未安装（软连接不存在）: {symlink_path}",
                 suggestion="无需卸载"
             )
         
-        if not symlink_path.is_symlink():
+        if not is_link:
             return ValidationResult(
                 status=ValidationStatus.WARNING,
                 message=f"目标位置不是软连接: {symlink_path}",
