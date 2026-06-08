@@ -7,6 +7,7 @@ import subprocess
 import ctypes
 import os
 import shutil
+import stat
 from pathlib import Path
 from typing import Union, Optional
 
@@ -205,8 +206,9 @@ class SymlinkManager:
     @staticmethod
     def _create_symlink_windows(source: Path, target: Path) -> None:
         """
-        Windows 创建目录联接/符号链接
-        注意：需要管理员权限
+        Windows 创建目录联接（junction）或符号链接
+        目录默认使用 junction（/J），不需要管理员权限
+        文件使用符号链接（需要管理员权限，但文件场景较少）
         """
         source_str = str(source)
         target_str = str(target)
@@ -215,11 +217,11 @@ class SymlinkManager:
         is_dir = source.is_dir()
         
         try:
-            # 尝试使用 ctypes 创建（Python 3.8+ 的 os.symlink 在 Windows 上也需要管理员权限）
-            # 使用 mklink 命令
             if is_dir:
-                cmd = ["cmd", "/c", "mklink", "/D", target_str, source_str]
+                # 目录使用 junction，不需要管理员权限
+                cmd = ["cmd", "/c", "mklink", "/J", target_str, source_str]
             else:
+                # 文件使用符号链接（需要管理员权限）
                 cmd = ["cmd", "/c", "mklink", target_str, source_str]
             
             result = subprocess.run(cmd, check=True, capture_output=True, text=True)
@@ -227,35 +229,59 @@ class SymlinkManager:
         except subprocess.CalledProcessError as e:
             error_msg = e.stderr.lower() if e.stderr else ""
             if "拒绝访问" in (e.stderr or "") or "access denied" in error_msg:
-                raise PermissionError(
-                    f"Windows 创建软连接需要管理员权限。\n"
-                    f"请以管理员身份重新运行，或手动执行：\n"
-                    f"  cmd /c mklink {'/D ' if is_dir else ''}\"{target_str}\" \"{source_str}\""
-                )
+                if is_dir:
+                    raise PermissionError(
+                        f"Windows 创建目录联接失败。\n"
+                        f"请尝试手动执行：\n"
+                        f"  cmd /c mklink /J \"{target_str}\" \"{source_str}\""
+                    )
+                else:
+                    raise PermissionError(
+                        f"Windows 创建软连接需要管理员权限。\n"
+                        f"请以管理员身份重新运行，或手动执行：\n"
+                        f"  cmd /c mklink \"{target_str}\" \"{source_str}\""
+                    )
             raise OSError(f"创建软连接失败: {e.stderr or e.stdout}")
         except FileNotFoundError:
             # cmd 不存在（极少见）
             raise OSError("无法找到 cmd.exe，请检查系统环境")
     
     @staticmethod
+    def _is_windows_reparse_point(path: Path) -> bool:
+        """检测 Windows 上的 reparse point（包括 junction 和符号链接）"""
+        if not PlatformInfo.is_windows():
+            return False
+        try:
+            st = os.lstat(str(path))
+            return bool(st.st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+        except (OSError, AttributeError):
+            return False
+    
+    @staticmethod
     def remove_symlink(path: Union[str, Path]) -> bool:
         """
-        删除软连接（不删除指向的目标）
+        删除软连接/junction（不删除指向的目标）
         
         Returns:
             是否成功删除
         """
         path = Path(path)
         
-        if not path.exists() and not path.is_symlink():
+        if not path.exists() and not SymlinkManager.is_symlink(path):
             return False
         
         try:
-            if path.is_dir() and not path.is_symlink():
+            if SymlinkManager._is_windows_reparse_point(path):
+                # Windows junction：使用 os.rmdir 只删除 junction，不删除目标
+                os.rmdir(str(path))
+            elif path.is_symlink():
+                # 软连接：直接 unlink
+                path.unlink()
+            elif path.is_dir():
                 # 是真实目录，使用 rmdir
                 shutil.rmtree(path)
             else:
-                # 是文件或软连接，直接删除
+                # 是文件，直接删除
                 path.unlink()
             return True
         except Exception:
@@ -263,27 +289,34 @@ class SymlinkManager:
     
     @staticmethod
     def is_symlink(path: Union[str, Path]) -> bool:
-        """检查路径是否为软连接"""
-        return Path(path).is_symlink()
+        """检查路径是否为软连接（包括 Windows junction）"""
+        path = Path(path)
+        return path.is_symlink() or SymlinkManager._is_windows_reparse_point(path)
     
     @staticmethod
     def read_symlink(path: Union[str, Path]) -> Optional[Path]:
-        """读取软连接指向的目标"""
+        """读取软连接/junction 指向的目标"""
         path = Path(path)
         if path.is_symlink():
             return Path(os.readlink(path))
+        # Windows junction
+        if SymlinkManager._is_windows_reparse_point(path):
+            try:
+                return path.resolve()
+            except Exception:
+                return None
         return None
     
     @staticmethod
     def verify_symlink(path: Union[str, Path]) -> bool:
         """
-        验证软连接是否可读（指向的目标存在）
+        验证软连接/junction 是否可读（指向的目标存在）
         
         Returns:
             软连接是否有效
         """
         path = Path(path)
-        if not path.is_symlink():
+        if not SymlinkManager.is_symlink(path):
             return False
         
         try:
